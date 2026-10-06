@@ -1,0 +1,197 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useApi } from '../auth/useApi';
+import { formatRupees } from '../../domain/money';
+import { formatQuantity } from '../../domain/units';
+import { formatDateTimeIST } from '../../domain/dates';
+
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2';
+
+const ADJUST_REASONS = ['OPENING_STOCK', 'DAMAGE', 'LOSS', 'FOUND', 'CORRECTION', 'OTHER'];
+
+// WHAT: one page to run a godown end-to-end: list/edit, see stock, adjust stock, view history.
+export default function GodownsPage() {
+  const fetchApi = useApi();
+  const [godowns, setGodowns] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [selected, setSelected] = useState<string>('');
+  const [stock, setStock] = useState<any[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [error, setError] = useState('');
+  const [tab, setTab] = useState<'stock' | 'history' | 'add' | 'adjust'>('stock');
+  const [name, setName] = useState(''); const [location, setLocation] = useState('');
+  const [editId, setEditId] = useState('');
+  const [search, setSearch] = useState('');
+  const [histSearch, setHistSearch] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const [g, p] = await Promise.all([fetchApi(`${API_URL}/admin/godowns`), fetchApi(`${API_URL}/admin/products`)]);
+      setGodowns(await g.json()); setProducts(await p.json());
+    } catch (e: any) { setError(e.message); }
+  }, [fetchApi]);
+
+  const loadStock = useCallback(async (id: string) => {
+    if (!id) { setStock([]); setHistory([]); return; }
+    const [s, h] = await Promise.all([
+      fetchApi(`${API_URL}/admin/godowns/${id}/stock`),
+      fetchApi(`${API_URL}/admin/godowns/${id}/history`),
+    ]);
+    setStock(await s.json()); setHistory(await h.json());
+  }, [fetchApi]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (godowns.length && !selected) setSelected(godowns[0].id); }, [godowns, selected]);
+  useEffect(() => { void loadStock(selected); }, [selected, loadStock]);
+
+  const toProduct = (row: any) => ({ id: row.product_id, name: row.product_name, pricePaise: row.price_paise ?? 0, unitsPerStrip: row.units_per_strip, stripsPerBox: row.strips_per_box, piecesPerBox: row.pieces_per_box });
+
+  const filteredStock = useMemo(() => stock.filter(r => r.product_name.toLowerCase().includes(search.toLowerCase())), [stock, search]);
+  const filteredHistory = useMemo(() => history.filter(r =>
+    (!histSearch || (r.type || '').includes(histSearch.toUpperCase()) || String(r.product_id).includes(histSearch))
+  ), [history, histSearch]);
+
+  const saveGodown = async () => {
+    if (!name || !location) return setError('Name and location required');
+    const res = editId
+      ? await fetchApi(`${API_URL}/admin/godowns/${editId}`, { method: 'PUT', body: JSON.stringify({ name, location_name: location }) })
+      : await fetchApi(`${API_URL}/admin/godowns`, { method: 'POST', body: JSON.stringify({ name, location_name: location }) });
+    if (!res.ok) return setError((await res.json()).error || 'Save failed');
+    setName(''); setLocation(''); setEditId(''); await load();
+  };
+
+  return (
+    <div className="space-y-4 dark:text-gray-100">
+      <h2 className="text-2xl font-bold">Godowns</h2>
+      {error && <p className="text-red-600">{error}</p>}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+        <h3 className="font-bold">Add / edit godown</h3>
+        <div className="flex flex-wrap gap-2">
+          <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="Godown name" value={name} onChange={e => setName(e.target.value)} />
+          <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="Location (e.g. Hardpiplya/Dewas)" value={location} onChange={e => setLocation(e.target.value)} />
+          <button onClick={saveGodown} className="bg-blue-600 text-white rounded px-4 py-2">{editId ? 'Update' : 'Add'}</button>
+          {editId && <button onClick={() => { setEditId(''); setName(''); setLocation(''); }} className="border rounded px-4 py-2">Cancel</button>}
+        </div>
+        <table className="min-w-full text-sm">
+          <thead className="text-left text-gray-500"><tr><th className="p-2">Name</th><th className="p-2">Location</th><th className="p-2"></th></tr></thead>
+          <tbody>{godowns.map(g => (
+            <tr key={g.id} className="border-t dark:border-gray-700">
+              <td className="p-2">
+                <button className={selected === g.id ? 'text-blue-600 font-bold' : ''} onClick={() => setSelected(g.id)}>{g.name}</button>
+              </td>
+              <td className="p-2">{g.location_name}</td>
+              <td className="p-2 text-right"><button className="text-blue-600" onClick={() => { setEditId(g.id); setName(g.name); setLocation(g.location_name); }}>Edit</button></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+
+      <div className="flex gap-2">
+        {(['stock', 'history', 'add', 'adjust'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)} className={`px-3 py-1 rounded ${tab === t ? 'bg-blue-600 text-white' : 'border dark:border-gray-600'}`}>{t === 'add' ? 'Stock in' : t === 'adjust' ? 'Adjust' : t === 'stock' ? 'Current stock' : 'History'}</button>
+        ))}
+      </div>
+
+      {tab === 'stock' && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+          <input className="border dark:border-gray-600 bg-transparent rounded p-2 w-full" placeholder="Search product…" value={search} onChange={e => setSearch(e.target.value)} />
+          <table className="min-w-full text-sm">
+            <thead className="text-left text-gray-500"><tr><th className="p-2">Product</th><th className="p-2">Quantity</th><th className="p-2">Value</th><th className="p-2">Status</th></tr></thead>
+            <tbody>{filteredStock.map(row => {
+              const prod = toProduct(row);
+              const low = row.quantity_pieces < prod.unitsPerStrip; // low when less than one strip worth
+              return (
+                <tr key={row.product_id} className="border-t dark:border-gray-700">
+                  <td className="p-2">{row.product_name}</td>
+                  <td className="p-2">{formatQuantity(row.quantity_pieces, prod)}</td>
+                  <td className="p-2">{formatRupees(row.quantity_pieces * prod.pricePaise)}</td>
+                  <td className="p-2">{low ? <span className="text-xs bg-red-100 text-red-700 rounded px-2 py-0.5">Low</span> : <span className="text-xs bg-green-100 text-green-700 rounded px-2 py-0.5">OK</span>}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'history' && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+          <input className="border dark:border-gray-600 bg-transparent rounded p-2 w-full" placeholder="Filter by type or product id…" value={histSearch} onChange={e => setHistSearch(e.target.value)} />
+          <table className="min-w-full text-sm">
+            <thead className="text-left text-gray-500"><tr><th className="p-2">When</th><th className="p-2">Type</th><th className="p-2">Product</th><th className="p-2">Qty</th><th className="p-2">Reason</th></tr></thead>
+            <tbody>{filteredHistory.map(r => (
+              <tr key={r.id} className="border-t dark:border-gray-700">
+                <td className="p-2">{formatDateTimeIST(r.timestamp ?? r.created_at)}</td>
+                <td className="p-2">{r.type}</td>
+                <td className="p-2">{r.product_id}</td>
+                <td className="p-2">{r.quantity_pieces}</td>
+                <td className="p-2">{r.reason || '-'}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'add' && <StockEntryForm mode="IN" godowns={godowns.filter(g => selected ? g.id === selected : true)} products={products} selectedGodown={selected} onDone={() => loadStock(selected)} />}
+      {tab === 'adjust' && <StockEntryForm mode="ADJ" godowns={godowns.filter(g => selected ? g.id === selected : true)} products={products} selectedGodown={selected} onDone={() => loadStock(selected)} />}
+    </div>
+  );
+}
+
+function StockEntryForm({ mode, godowns, products, selectedGodown, onDone }: any) {
+  const fetchApi = useApi();
+  const [godownId, setGodownId] = useState(selectedGodown || '');
+  const [productId, setProductId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [unit, setUnit] = useState<'BOX' | 'STRIP' | 'PIECE'>('BOX');
+  const [kind, setKind] = useState(mode === 'IN' ? 'IN' : 'ADJ_PLUS');
+  const [reason, setReason] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
+  const [idempotencyKey] = useState(() => `adj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+
+  const product = products.find((p: any) => p.id === productId);
+
+  const submit = async () => {
+    if (!godownId || !productId || !reason || !Number(amount)) return setError('All fields except note are required');
+    const pieces = Number(amount) * (unit === 'BOX' ? product?.pieces_per_box ?? 1 : unit === 'STRIP' ? product?.units_per_strip ?? 1 : 1);
+    const res = await fetchApi(`${API_URL}/admin/stock/adjust`, {
+      method: 'POST',
+      body: JSON.stringify({ godown_id: godownId, product_id: productId, quantity_pieces: pieces, kind, reason, note, idempotency_key: idempotencyKey }),
+    });
+    const body = await res.json();
+    if (!res.ok) return setError(body.error || 'Failed');
+    onDone();
+    setAmount(''); setNote(''); setReason('');
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+      <h3 className="font-bold">{mode === 'IN' ? 'Stock in' : 'Stock adjustment'}</h3>
+      <select value={godownId} onChange={e => setGodownId(e.target.value)} className="border dark:border-gray-600 bg-transparent rounded p-2 w-full">
+        <option value="">Select godown</option>{godowns.map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}
+      </select>
+      <select value={productId} onChange={e => setProductId(e.target.value)} className="border dark:border-gray-600 bg-transparent rounded p-2 w-full">
+        <option value="">Select product</option>{products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+      <div className="flex gap-2">
+        <input type="number" min="0" className="border dark:border-gray-600 bg-transparent rounded p-2 flex-1" placeholder="Quantity" value={amount} onChange={e => setAmount(e.target.value)} />
+        <select value={unit} onChange={e => setUnit(e.target.value as any)} className="border dark:border-gray-600 bg-transparent rounded p-2">
+          <option>BOX</option><option>STRIP</option><option>PIECE</option>
+        </select>
+        {mode === 'IN' ? (
+          <span className="border dark:border-gray-600 rounded p-2 text-sm">Type: IN</span>
+        ) : (
+          <select value={kind} onChange={e => setKind(e.target.value)} className="border dark:border-gray-600 bg-transparent rounded p-2">
+            <option value="ADJ_PLUS">ADJ+</option><option value="ADJ_MINUS">ADJ-</option>
+          </select>
+        )}
+      </div>
+      <select value={reason} onChange={e => setReason(e.target.value)} className="border dark:border-gray-600 bg-transparent rounded p-2 w-full">
+        <option value="">Select reason (required)</option>{ADJUST_REASONS.map(r => <option key={r}>{r}</option>)}
+      </select>
+      <input className="border dark:border-gray-600 bg-transparent rounded p-2 w-full" placeholder="Optional note" value={note} onChange={e => setNote(e.target.value)} />
+      <p className="text-xs text-gray-500">Stock is never allowed to go negative. Idempotency key: {idempotencyKey} (safe to retry).</p>
+      {error && <p className="text-red-600">{error}</p>}
+      <button onClick={submit} className="bg-blue-600 text-white rounded px-4 py-2">Submit</button>
+    </div>
+  );
+}

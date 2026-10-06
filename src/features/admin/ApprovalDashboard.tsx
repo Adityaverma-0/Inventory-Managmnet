@@ -1,25 +1,44 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useApi } from '../auth/useApi';
 import { ArrowLeft, CheckCircle, RotateCcw, XCircle } from 'lucide-react';
 import { formatRupees } from '../../domain/money';
+import { formatDateTimeIST, formatCalendarDateIST } from '../../domain/dates';
 import StockSummaryTable from '../stock/StockSummaryTable';
 import CashBreakdownTable from '../CashBreakdownTable';
+
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2';
 
 export default function ApprovalDashboard() {
-  // const navigate = useNavigate();
+  const fetchApi = useApi();
   const [requests, setRequests] = useState<any[]>([]);
+  const [salesmen, setSalesmen] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyDayId, setBusyDayId] = useState('');
   const [selectedReq, setSelectedReq] = useState<any>(null);
 
+  const getSalesmanName = useCallback((id: string) => {
+    const row = salesmen.find(s => s.id === id);
+    return row ? row.name : id;
+  }, [salesmen]);
+  const getVehicleName = useCallback((id: string) => {
+    const row = vehicles.find(v => v.id === id);
+    return row ? row.name : id;
+  }, [vehicles]);
+
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/unload-requests`);
+      const res = await fetchApi(`${API_URL}/unload-requests`, {  });
       if (!res.ok) throw new Error('Failed to fetch from backend');
       const data = await res.json();
-      setRequests(data.requests);
+      setRequests(Array.isArray(data) ? data.map((d: any) => ({ ...d, requestData: d.request_data || d.requestData })) : []);
+      // WHY: names are now fetched from the master tables; id is only a fallback.
+      try {
+        const [sRes, vRes] = await Promise.all([fetchApi(`${API_URL}/admin/salesmen`), fetchApi(`${API_URL}/admin/vehicles`)]);
+        setSalesmen(await sRes.json()); setVehicles(await vRes.json());
+      } catch { /* keep empty maps; id will show as fallback */ }
       setError('');
     } catch (loadError) {
       console.error('Failed to load admin approval dashboard', loadError);
@@ -55,7 +74,7 @@ export default function ApprovalDashboard() {
     setBusyDayId(reqObj.id);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/unload-requests/${reqObj.id}/approve`, { method: 'POST' });
+      const res = await fetchApi(`${API_URL}/unload-requests/${reqObj.id}/approve`, { method: 'POST'});
       if (!res.ok) throw new Error('Backend approval failed');
       await refresh();
       setSelectedReq(null);
@@ -77,9 +96,9 @@ export default function ApprovalDashboard() {
     setBusyDayId(reqObj.id);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/unload-requests/${reqObj.id}/send-back`, { 
+      const res = await fetchApi(`${API_URL}/unload-requests/${reqObj.id}/send-back`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+
         body: JSON.stringify({ note: note.trim() })
       });
       if (!res.ok) throw new Error('Backend send back failed');
@@ -119,11 +138,11 @@ export default function ApprovalDashboard() {
         <div className="overflow-x-auto rounded border border-gray-200 dark:border-gray-800">
           <table className="w-full text-left border-collapse bg-white dark:bg-gray-900">
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800 w-1/3">Salesman</th><td className="p-2 font-bold">{day.salesmanId}</td></tr>
-              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800">Vehicle & Location</th><td className="p-2">{day.vehicleId}</td></tr>
-              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800">Date</th><td className="p-2">{new Date(day.calendarDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</td></tr>
+              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800 w-1/3">Salesman</th><td className="p-2 font-bold">{getSalesmanName(day.salesmanId)} <span className="text-gray-400 font-normal">({day.salesmanId})</span></td></tr>
+              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800">Vehicle & Location</th><td className="p-2">{getVehicleName(day.vehicleId)} <span className="text-gray-400">({day.vehicleId})</span></td></tr>
+              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800">Date</th><td className="p-2">{formatCalendarDateIST(day.calendarDate)}</td></tr>
               <tr><th className="p-2 bg-gray-50 dark:bg-gray-800">Status</th><td className="p-2 font-bold uppercase">{reqObj.status}</td></tr>
-              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800">Submitted Time</th><td className="p-2">{new Date(reqObj.requestedAt).toLocaleString()}</td></tr>
+              <tr><th className="p-2 bg-gray-50 dark:bg-gray-800">Submitted Time</th><td className="p-2">{formatDateTimeIST(reqObj.requestedAt)}</td></tr>
             </tbody>
           </table>
         </div>
@@ -230,8 +249,10 @@ export default function ApprovalDashboard() {
           <div key={reqObj.id} onClick={() => setSelectedReq(reqObj)} className="cursor-pointer rounded border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 hover:border-blue-500">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="font-bold text-gray-900 dark:text-white">{reqObj.requestData.salesmanId}</h3>
-                <div className="text-sm text-gray-500">{new Date(reqObj.requestedAt).toLocaleString()}</div>
+                <h3 className="font-bold text-gray-900 dark:text-white">{getSalesmanName(reqObj.requestData.salesmanId)}</h3>
+                <div className="text-xs text-gray-500">{getVehicleName(reqObj.requestData.vehicleId)}</div>
+                <div className="text-sm text-gray-500">{formatDateTimeIST(reqObj.requestedAt)}</div>
+                <div className="text-xs text-gray-400">Date: {formatCalendarDateIST(reqObj.requestData?.calendarDate)}</div>
               </div>
               <div className={`font-bold px-2 py-1 rounded text-xs ${reqObj.status === 'APPROVED' ? 'bg-green-100 text-green-800' : reqObj.status === 'SENT_BACK' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
                 {reqObj.status}
