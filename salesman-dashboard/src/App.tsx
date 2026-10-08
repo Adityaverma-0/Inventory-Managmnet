@@ -71,13 +71,13 @@ function Layout({ children, onLogout }: { children: React.ReactNode, onLogout: (
     <div className={`min-h-screen bg-gray-50 dark:bg-gray-950 ${!isPrint ? 'pb-16' : ''}`}>
       {!isPrint && !location.pathname.startsWith('/sell') && (
         <header className="bg-white dark:bg-gray-900 shadow-sm px-4 py-3 flex justify-between items-center sticky top-0 z-40 print:hidden">
-          <div className="flex items-center gap-2"><h1 className="text-lg font-bold">Salesman Dashboard</h1><button onClick={onLogout} className="text-[10px] bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200">Logout</button></div>
+          <h1 className="text-lg font-bold">Salesman Dashboard</h1>
           <div className="flex items-center space-x-2">
             <span className="flex h-3 w-3 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
             </span>
-            <span className="text-sm font-bold text-gray-600 dark:text-gray-300">Online</span>
+            <span className="text-sm font-bold text-gray-600 dark:text-gray-300 mr-2">Online</span><button onClick={onLogout} className="text-sm text-gray-600 dark:text-gray-400 font-medium hover:text-gray-900 border-l border-gray-300 pl-3">Logout</button>
           </div>
         </header>
       )}
