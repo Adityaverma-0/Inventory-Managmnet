@@ -14,6 +14,7 @@ export default function ManualStockPage() {
   const [quantity, setQuantity] = useState('');
   const [reason, setReason] = useState('OTHER');
   const [note, setNote] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -41,6 +42,10 @@ export default function ManualStockPage() {
   };
 
   useEffect(() => { loadStock(selectedGodown); }, [selectedGodown]);
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleSubmit = async () => {
     if (!selectedGodown || !productId || !Number(quantity)) return;
@@ -80,9 +85,16 @@ export default function ManualStockPage() {
           <div className="bg-white dark:bg-gray-800 p-4 rounded shadow">
             <h3 className="font-bold mb-4">Add Manual Stock</h3>
             <div className="space-y-3">
+              <input 
+                type="text" 
+                placeholder="Search Product..." 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+                className="w-full p-2 border rounded bg-transparent" 
+              />
               <select value={productId} onChange={e => setProductId(e.target.value)} className="w-full p-2 border rounded bg-transparent">
                 <option value="">Select Product</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {filteredProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <input type="number" placeholder="Quantity (pieces)" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full p-2 border rounded bg-transparent" />
               <select value={reason} onChange={e => setReason(e.target.value)} className="w-full p-2 border rounded bg-transparent">

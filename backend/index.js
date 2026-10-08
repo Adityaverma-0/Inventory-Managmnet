@@ -266,5 +266,5 @@ if (process.env.NODE_ENV !== 'test') {
     const shutdown = () => server.close(() => pool.end());
     process.on('SIGTERM', shutdown);
     process.on('SIGINT', shutdown);
-  }).catch(error => { console.error('Database initialization failed:', error.message); process.exitCode = 1; });
+  }).catch(error => { console.error('Database initialization failed:', error); process.exitCode = 1; });
 }
