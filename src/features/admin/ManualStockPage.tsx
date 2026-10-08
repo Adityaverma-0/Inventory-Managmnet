@@ -20,13 +20,16 @@ export default function ManualStockPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [g, p] = await Promise.all([
+      const [gRes, pRes] = await Promise.all([
         fetchApi(`${API_URL}/admin/godowns`),
         fetchApi(`${API_URL}/admin/products`)
       ]);
-      setGodowns(await g.json());
-      setProducts(await p.json());
-    } catch (e) { console.error(e); }
+      const g = await gRes.json();
+      const p = await pRes.json();
+      console.log('Loaded products:', p);
+      setGodowns(g);
+      setProducts(p);
+    } catch (e) { console.error('Error loading data:', e); }
   }, [fetchApi]);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -35,8 +38,11 @@ export default function ManualStockPage() {
     if (!godownId) return;
     try {
       const res = await fetchApi(`${API_URL}/admin/godowns/${godownId}/stock`);
-      setStock(await res.json());
+      const s = await res.json();
+      console.log('Loaded stock:', s);
+      setStock(s);
     } catch (e) {
+      console.error('Error loading stock:', e);
       setStock([]);
     }
   };
@@ -44,8 +50,10 @@ export default function ManualStockPage() {
   useEffect(() => { loadStock(selectedGodown); }, [selectedGodown]);
 
   const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  
+  console.log('Search term:', searchTerm, 'Filtered products:', filteredProducts.length);
 
   const handleSubmit = async () => {
     if (!selectedGodown || !productId || !Number(quantity)) return;
@@ -53,6 +61,7 @@ export default function ManualStockPage() {
     try {
       await fetchApi(`${API_URL}/admin/stock/adjust`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             godown_id: selectedGodown,
             product_id: productId,
