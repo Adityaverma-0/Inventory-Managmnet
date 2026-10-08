@@ -42,4 +42,10 @@ Database tests are opt-in. Set `TEST_DATABASE_URL` for the invoice integration t
 
 ## Deployment
 
+For Render, create a Docker Web Service from the latest pushed commit on `main`. Leave Root Directory empty, set Dockerfile Path to `./backend/Dockerfile`, and Docker Build Context to `.`. Leave Docker Command empty. The image installs Node.js, Python and Tesseract, applies additive database migrations at startup, and then starts the API on `PORT` (default 10000). Use one instance during initial migration.
+
+Set `DATABASE_URL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH`, and `CORS_ORIGINS` as Render environment variables. Copy the existing private admin hash into the service configuration; credentials are not included in the Docker image. Initially, CORS may list `http://localhost:5174,http://localhost:5173`; replace or extend it with the actual dashboard origins after Vercel deployment. Keep the HTTP health-check path unset until a dedicated endpoint is configured; authenticated API routes intentionally return 401 without a session.
+
+The Dockerfile needs repository-root build context because it copies both `backend/` and `schema.sql`. An older Git commit without `backend/` cannot build this image. Confirm the deployment commit contains these files before retrying.
+
 Build both frontends and serve their dist directories with SPA fallback. Run `npm --prefix backend start` under the existing process supervisor. Configure TLS at the existing reverse proxy, backend environment, database access, Python executable and OCR dependencies. No new hosting infrastructure is required. Apply migrations before serving traffic; preserve a database backup and the previous application build for rollback. Review the current handover report for tested scope and remaining dependency advisories.
