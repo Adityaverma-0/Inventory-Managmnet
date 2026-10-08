@@ -150,7 +150,7 @@ export function installOperations(app,pool) {
   app.get('/api/v2/admin/:location_type(godowns|vehicles)/:id/history',endpoint(async req=>(await pool.query('SELECT l.*,p.name AS product_name FROM stock_ledger l JOIN products p ON p.id=l.product_id WHERE l.location_id=$1 ORDER BY l.timestamp DESC LIMIT 200',[req.params.id])).rows));
   app.get('/api/v2/admin/audit',endpoint(async ()=> (await pool.query('SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 200')).rows));
 
-  app.get('/api/v2/admin/sales-dashboard', endpoint(async req => {
+  app.get('/api/v2/admin/sales', endpoint(async req => {
     let dateFilter = '';
     const params = [];
     const qDate = req.query.date;
@@ -206,14 +206,6 @@ export function installOperations(app,pool) {
 
 
 
-
-  app.post('/api/v2/admin/purchases',endpoint(req=>operation(pool,req,'purchase',async c=>{
-    const {godown_id,lines}=req.body,ref=text(req.body.invoice_ref,'Invoice reference');await activeGodown(c,godown_id);
-    const items=await productsFor(c,lines),id=uid();await lockStock(c,[godown_id],items.map(i=>i.productId));
-    await c.query('INSERT INTO purchases(id,timestamp,invoice_ref,godown_id) VALUES($1,$2,$3,$4)',[id,Date.now(),ref,godown_id]);
-    for(const i of items){await c.query('INSERT INTO purchase_lines(purchase_id,product_id,quantity_pieces) VALUES($1,$2,$3)',[id,i.productId,i.quantityPieces]);await ledger(c,'LOAD_IN',i.productId,i.quantityPieces,godown_id,id,null,'PURCHASE_RECEIPT');}
-    await audit(c,'PURCHASE_RECEIPT',id,{invoice_ref:ref,godown_id});return {id,success:true};
-  })));
   app.post('/api/v2/admin/stock/adjust',endpoint(req=>operation(pool,req,'adjust',async c=>{
     let {godown_id,product_id,quantity_pieces,kind,reason,unit,unit_quantity}=req.body;await activeGodown(c,godown_id);
     if(!['IN','OUT','ADJ_PLUS','ADJ_MINUS'].includes(kind))throw new ApiError('Invalid adjustment kind.');

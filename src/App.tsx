@@ -10,7 +10,6 @@ import GodownsPage from './features/admin/GodownsPage';
 import VehiclesPage from './features/admin/VehiclesPage';
 import ProductsPage from './features/admin/ProductsPage';
 import SalesmenPage from './features/admin/SalesmenPage';
-import PurchaseWorkflow from './features/admin/PurchaseWorkflow';
 import InventoryImport from './features/admin/InventoryImport';
 import ManualStockPage from './features/admin/ManualStockPage';
 import SalesDashboard from './features/admin/SalesDashboard';
@@ -52,7 +51,6 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
             <NavLink to="/vehicles" className={navClass}><Truck size={18} /> Vehicles</NavLink>
             <NavLink to="/products" className={navClass}><Package size={18} /> Products</NavLink>
             <NavLink to="/salesmen" className={navClass}><Users size={18} /> Salesmen</NavLink>
-            <NavLink to="/purchase" className={navClass}><Receipt size={18} /> Purchases (Receipts)</NavLink>
             <NavLink to="/inventory/import" className={navClass}><FileUp size={18} /> Inventory PDF Import</NavLink>
             <NavLink to="/manual-stock" className={navClass}><Database size={18} /> Manual Stock Add</NavLink>
             <NavLink to="/sales-dashboard" className={navClass}><TrendingUp size={18} /> Sales Dashboard</NavLink>
@@ -82,7 +80,6 @@ function App() {
                   <Route path="/vehicles" element={<VehiclesPage />} />
                   <Route path="/products" element={<ProductsPage />} />
                   <Route path="/salesmen" element={<SalesmenPage />} />
-                  <Route path="/purchase" element={<PurchaseWorkflow />} />
                   <Route path="/inventory/import" element={<InventoryImport />} />
                   <Route path="/manual-stock" element={<ManualStockPage />} />
                   <Route path="/sales-dashboard" element={<SalesDashboard />} />
