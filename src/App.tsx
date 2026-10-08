@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
-import { CheckCircle, List, Warehouse, Truck, Package, Users, Receipt, FileUp, Database } from 'lucide-react';
+import { CheckCircle, List, Warehouse, Truck, Package, Users, Receipt, FileUp, Database , TrendingUp} from 'lucide-react';
 
 import Login from './features/auth/Login';
 import ApprovalDashboard from './features/admin/ApprovalDashboard';
@@ -13,6 +13,8 @@ import SalesmenPage from './features/admin/SalesmenPage';
 import PurchaseWorkflow from './features/admin/PurchaseWorkflow';
 import InventoryImport from './features/admin/InventoryImport';
 import ManualStockPage from './features/admin/ManualStockPage';
+import SalesDashboard from './features/admin/SalesDashboard';
+
 
 import './App.css';
 
@@ -53,6 +55,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
             <NavLink to="/purchase" className={navClass}><Receipt size={18} /> Purchases (Receipts)</NavLink>
             <NavLink to="/inventory/import" className={navClass}><FileUp size={18} /> Inventory PDF Import</NavLink>
             <NavLink to="/manual-stock" className={navClass}><Database size={18} /> Manual Stock Add</NavLink>
+            <NavLink to="/sales-dashboard" className={navClass}><TrendingUp size={18} /> Sales Dashboard</NavLink>
           </nav>
         </aside>
         <main className="flex-1 min-w-0 p-4 md:p-6 overflow-auto">
@@ -82,6 +85,7 @@ function App() {
                   <Route path="/purchase" element={<PurchaseWorkflow />} />
                   <Route path="/inventory/import" element={<InventoryImport />} />
                   <Route path="/manual-stock" element={<ManualStockPage />} />
+                  <Route path="/sales-dashboard" element={<SalesDashboard />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </AdminLayout>

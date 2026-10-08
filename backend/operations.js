@@ -149,6 +149,59 @@ export function installOperations(app,pool) {
   app.get('/api/v2/admin/:location_type(godowns|vehicles)/:id/stock',endpoint(async req=>(await pool.query(`SELECT p.id AS product_id,p.name AS product_name,p.price_paise,p.pieces_per_box,p.strips_per_box,p.units_per_strip,(${sumSQL.replaceAll('type','l.type').replaceAll('quantity_pieces','l.quantity_pieces')})::integer AS quantity_pieces FROM products p LEFT JOIN stock_ledger l ON l.product_id=p.id AND l.location_id=$1 GROUP BY p.id ORDER BY p.name`,[req.params.id])).rows));
   app.get('/api/v2/admin/:location_type(godowns|vehicles)/:id/history',endpoint(async req=>(await pool.query('SELECT l.*,p.name AS product_name FROM stock_ledger l JOIN products p ON p.id=l.product_id WHERE l.location_id=$1 ORDER BY l.timestamp DESC LIMIT 200',[req.params.id])).rows));
   app.get('/api/v2/admin/audit',endpoint(async ()=> (await pool.query('SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 200')).rows));
+
+  app.get('/api/v2/admin/sales-dashboard', endpoint(async req => {
+    let dateFilter = '';
+    const params = [];
+    const qDate = req.query.date;
+    const period = req.query.period;
+    
+    // Default to today
+    const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
+
+    if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) {
+      dateFilter = 'calendar_date = $1';
+      params.push(qDate);
+    } else if (period === 'week') {
+      dateFilter = "calendar_date >= ($1::date - interval '6 days') AND calendar_date <= $1";
+      params.push(todayDateStr);
+    } else if (period === 'month') {
+      dateFilter = "calendar_date >= date_trunc('month', $1::date) AND calendar_date <= $1";
+      params.push(todayDateStr);
+    } else {
+      // 'today' or fallback
+      dateFilter = 'calendar_date = $1';
+      params.push(todayDateStr);
+    }
+
+    const { rows: stats } = await pool.query(
+      `SELECT 
+         COALESCE(SUM(total_amount_paise), 0) AS total_sales,
+         COUNT(id) AS total_orders,
+         COUNT(DISTINCT customer_id) AS unique_customers
+       FROM invoices 
+       WHERE status='VALID' AND ${dateFilter}`, params
+    );
+
+    const { rows: rawInvoices } = await pool.query(
+      `SELECT id, invoice_number, created_at, customer_name, total_amount_paise, payment_mode, status
+       FROM invoices 
+       WHERE status='VALID' AND ${dateFilter} 
+       ORDER BY created_at DESC`, params
+    );
+
+    const s = stats[0];
+    const totalOrders = Number(s.total_orders);
+    const totalSales = Number(s.total_sales);
+    const uniqueCustomers = Number(s.unique_customers);
+    const avgOrderValue = totalOrders > 0 ? Math.round(totalSales / totalOrders) : 0;
+
+    return {
+      stats: { totalSales, totalOrders, uniqueCustomers, avgOrderValue },
+      invoices: rawInvoices.map(i => ({...i, total_amount_paise: Number(i.total_amount_paise)}))
+    };
+  }));
+
   app.post('/api/v2/admin/purchases',endpoint(req=>operation(pool,req,'purchase',async c=>{
     const {godown_id,lines}=req.body,ref=text(req.body.invoice_ref,'Invoice reference');await activeGodown(c,godown_id);
     const items=await productsFor(c,lines),id=uid();await lockStock(c,[godown_id],items.map(i=>i.productId));
