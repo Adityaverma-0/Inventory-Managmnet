@@ -155,8 +155,6 @@ export function installOperations(app,pool) {
     const params = [];
     const qDate = req.query.date;
     const period = req.query.period;
-    
-    // Default to today
     const todayDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 
     if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) {
@@ -169,7 +167,6 @@ export function installOperations(app,pool) {
       dateFilter = "calendar_date >= date_trunc('month', $1::date) AND calendar_date <= $1";
       params.push(todayDateStr);
     } else {
-      // 'today' or fallback
       dateFilter = 'calendar_date = $1';
       params.push(todayDateStr);
     }
@@ -202,6 +199,14 @@ export function installOperations(app,pool) {
     };
   }));
 
+
+
+
+
+
+
+
+
   app.post('/api/v2/admin/purchases',endpoint(req=>operation(pool,req,'purchase',async c=>{
     const {godown_id,lines}=req.body,ref=text(req.body.invoice_ref,'Invoice reference');await activeGodown(c,godown_id);
     const items=await productsFor(c,lines),id=uid();await lockStock(c,[godown_id],items.map(i=>i.productId));
@@ -213,14 +218,7 @@ export function installOperations(app,pool) {
     let {godown_id,product_id,quantity_pieces,kind,reason,unit,unit_quantity}=req.body;await activeGodown(c,godown_id);
     if(!['IN','OUT','ADJ_PLUS','ADJ_MINUS'].includes(kind))throw new ApiError('Invalid adjustment kind.');
     if (unit && unit !== 'PIECE') {
-      const pData = (await c.query('SELECT strips_per_box, units_per_strip FROM products WHERE id=
-    const {godown_id,product_id,quantity_pieces,kind,reason}=req.body;await activeGodown(c,godown_id);
-    if(!['IN','OUT','ADJ_PLUS','ADJ_MINUS'].includes(kind))throw new ApiError('Invalid adjustment kind.');
-    const [i]=await productsFor(c,[{product_id,quantity_pieces}]);await lockStock(c,[godown_id],[product_id]);
-    const minus=['OUT','ADJ_MINUS'].includes(kind),qty=await balance(c,godown_id,product_id);
-    if(minus && qty<i.quantityPieces)throw new ApiError(`Insufficient inventory. Available quantity: ${qty}.`,409);
-    const id=uid();await ledger(c,minus?'ADJ_MINUS':'ADJ_PLUS',product_id,i.quantityPieces,godown_id,id,null,text(reason,'Reason'));
-    await audit(c,'STOCK_ADJUSTMENT',id,{godown_id,product_id,quantity_pieces,kind}); FOR SHARE', [product_id])).rows[0];
+      const pData = (await c.query('SELECT strips_per_box, units_per_strip FROM products WHERE id=$1 FOR SHARE', [product_id])).rows[0];
       if (!pData) throw new ApiError('Product not found.');
       const q = integer(unit_quantity, 'Quantity', 1);
       if (unit === 'BOX') quantity_pieces = q * pData.strips_per_box * pData.units_per_strip;
