@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApi } from '../auth/useApi';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2';
@@ -26,7 +26,6 @@ export default function ManualStockPage() {
       ]);
       const g = await gRes.json();
       const p = await pRes.json();
-      console.log('Loaded products:', p);
       setGodowns(g);
       setProducts(p);
     } catch (e) { console.error('Error loading data:', e); }
@@ -38,22 +37,20 @@ export default function ManualStockPage() {
     if (!godownId) return;
     try {
       const res = await fetchApi(`${API_URL}/admin/godowns/${godownId}/stock`);
-      const s = await res.json();
-      console.log('Loaded stock:', s);
-      setStock(s);
+      setStock(await res.json());
     } catch (e) {
-      console.error('Error loading stock:', e);
       setStock([]);
     }
   };
 
   useEffect(() => { loadStock(selectedGodown); }, [selectedGodown]);
 
-  const filteredProducts = products.filter(p => 
-    p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  console.log('Search term:', searchTerm, 'Filtered products:', filteredProducts.length);
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return products;
+    return products.filter(p => 
+      p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [products, searchTerm]);
 
   const handleSubmit = async () => {
     if (!selectedGodown || !productId || !Number(quantity)) return;
@@ -73,6 +70,8 @@ export default function ManualStockPage() {
       });
       setMessage('Stock added successfully');
       setQuantity(''); setNote('');
+      setSearchTerm('');
+      setProductId('');
       loadStock(selectedGodown);
     } catch (e: any) { setMessage('Error: ' + e.message); }
     finally { setIsSubmitting(false); }
@@ -101,8 +100,16 @@ export default function ManualStockPage() {
                 onChange={e => setSearchTerm(e.target.value)} 
                 className="w-full p-2 border rounded bg-transparent" 
               />
-              <select value={productId} onChange={e => setProductId(e.target.value)} className="w-full p-2 border rounded bg-transparent">
-                <option value="">Select Product</option>
+              <select 
+                value={productId} 
+                onChange={e => setProductId(e.target.value)} 
+                className="w-full p-2 border rounded bg-transparent"
+              >
+                <option value="">
+                  {searchTerm 
+                    ? (filteredProducts.length > 0 ? `Select from ${filteredProducts.length} matches...` : 'No matches found')
+                    : 'Select Product...'}
+                </option>
                 {filteredProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <input type="number" placeholder="Quantity (pieces)" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full p-2 border rounded bg-transparent" />
