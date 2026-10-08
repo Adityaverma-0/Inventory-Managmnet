@@ -12,6 +12,7 @@ export default function ManualStockPage() {
   const [selectedGodown, setSelectedGodown] = useState('');
   const [productId, setProductId] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [unit, setUnit] = useState('PIECE');
   const [reason, setReason] = useState('OTHER');
   const [note, setNote] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,14 +21,10 @@ export default function ManualStockPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [gRes, pRes] = await Promise.all([
-        fetchApi(`${API_URL}/admin/godowns`),
-        fetchApi(`${API_URL}/admin/products`)
-      ]);
-      const g = await gRes.json();
-      const p = await pRes.json();
-      setGodowns(g);
-      setProducts(p);
+      const gRes = await fetchApi(`${API_URL}/admin/godowns`);
+      const pRes = await fetchApi(`${API_URL}/admin/products`);
+      setGodowns(await gRes.json());
+      setProducts(await pRes.json());
     } catch (e) { console.error('Error loading data:', e); }
   }, [fetchApi]);
 
@@ -45,12 +42,27 @@ export default function ManualStockPage() {
 
   useEffect(() => { loadStock(selectedGodown); }, [selectedGodown]);
 
+  const selectedProduct = useMemo(() => products.find(p => p.id === productId), [products, productId]);
+
   const filteredProducts = useMemo(() => {
     if (!searchTerm) return products;
     return products.filter(p => 
       p.name && p.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [products, searchTerm]);
+
+  const getPiecesMultiplier = () => {
+    if (!selectedProduct) return 1;
+    if (unit === 'BOX') return Number(selectedProduct.pieces_per_box) || 0;
+    if (unit === 'STRIP') return Number(selectedProduct.units_per_strip) || 0;
+    return 1;
+  };
+
+  const calculatedPieces = useMemo(() => {
+    const q = Number(quantity);
+    if (!q || q <= 0) return 0;
+    return q * getPiecesMultiplier();
+  }, [quantity, unit, selectedProduct]);
 
   const handleSubmit = async () => {
     if (!selectedGodown || !productId || !Number(quantity)) return;
@@ -62,7 +74,9 @@ export default function ManualStockPage() {
         body: JSON.stringify({
             godown_id: selectedGodown,
             product_id: productId,
-            quantity_pieces: Number(quantity),
+            quantity_pieces: calculatedPieces,
+            unit,
+            unit_quantity: Number(quantity),
             kind: 'IN', // Manual Add
             reason,
             note
@@ -72,6 +86,7 @@ export default function ManualStockPage() {
       setQuantity(''); setNote('');
       setSearchTerm('');
       setProductId('');
+      setUnit('PIECE');
       loadStock(selectedGodown);
     } catch (e: any) { setMessage('Error: ' + e.message); }
     finally { setIsSubmitting(false); }
@@ -100,25 +115,27 @@ export default function ManualStockPage() {
                 onChange={e => setSearchTerm(e.target.value)} 
                 className="w-full p-2 border rounded bg-transparent" 
               />
-              <select 
-                value={productId} 
-                onChange={e => setProductId(e.target.value)} 
-                className="w-full p-2 border rounded bg-transparent"
-              >
-                <option value="">
-                  {searchTerm 
-                    ? (filteredProducts.length > 0 ? `Select from ${filteredProducts.length} matches...` : 'No matches found')
-                    : 'Select Product...'}
-                </option>
+              <select value={productId} onChange={e => { setProductId(e.target.value); setUnit('PIECE'); }} className="w-full p-2 border rounded bg-transparent">
+                <option value="">{searchTerm ? (filteredProducts.length > 0 ? `Select from ${filteredProducts.length} matches...` : 'No matches found') : 'Select Product...'}</option>
                 {filteredProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <input type="number" placeholder="Quantity (pieces)" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full p-2 border rounded bg-transparent" />
+              
+              <div className="flex gap-2">
+                <input type="number" placeholder="Quantity" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full p-2 border rounded bg-transparent" />
+                <select value={unit} onChange={e => setUnit(e.target.value)} className="p-2 border rounded bg-transparent w-32">
+                  <option value="PIECE">Pieces</option>
+                  <option value="STRIP" disabled={!selectedProduct || !selectedProduct.units_per_strip}>Strips</option>
+                  <option value="BOX" disabled={!selectedProduct || !selectedProduct.pieces_per_box}>Boxes</option>
+                </select>
+              </div>
+              {calculatedPieces > 0 && <p className="text-sm text-gray-500">Preview: {calculatedPieces} total pieces.</p>}
+
               <select value={reason} onChange={e => setReason(e.target.value)} className="w-full p-2 border rounded bg-transparent">
                 <option value="OPENING_STOCK">Opening Stock</option>
                 <option value="OTHER">Other</option>
               </select>
               <input placeholder="Note" value={note} onChange={e => setNote(e.target.value)} className="w-full p-2 border rounded bg-transparent" />
-              <button disabled={isSubmitting} onClick={handleSubmit} className="w-full bg-blue-600 text-white p-2 rounded">Add Stock</button>
+              <button disabled={isSubmitting || calculatedPieces <= 0} onClick={handleSubmit} className="w-full bg-blue-600 text-white p-2 rounded">Add Stock</button>
               {message && <p className="text-sm p-2">{message}</p>}
             </div>
           </div>
