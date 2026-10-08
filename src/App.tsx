@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
-import { CheckCircle, List, Warehouse, Truck, Package, Users, Receipt, FileUp, Database , TrendingUp} from 'lucide-react';
+import { CheckCircle, List, Warehouse, Truck, Package, Users, FileUp, Database , TrendingUp} from 'lucide-react';
 
 import Login from './features/auth/Login';
 import ApprovalDashboard from './features/admin/ApprovalDashboard';
