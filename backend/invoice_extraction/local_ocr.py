@@ -32,7 +32,7 @@ def recognize(image, folder, name, psm, deadline=None):
     path = str(Path(folder, name + '.png').resolve())
     image.save(path)
     command = [tesseract_binary(), path, 'stdout', '-l', 'eng', '--psm', str(psm), '-c', 'tessedit_create_tsv=1', '-c', 'thresholding_method=2']
-    remaining = min(25, deadline - time.monotonic()) if deadline is not None else 10000
+    remaining = min(25, deadline - time.monotonic()) if deadline is not None else 60
     if remaining <= 0:
         raise OCRError('OCR_TIMEOUT', 'Local OCR timed out. Try fewer pages or a clearer PDF.')
     try:

@@ -124,7 +124,7 @@ export default function ApprovalDashboard() {
     const cashDiff = day.cashCollected - totals.cash;
 
     return (
-      <div className="mx-auto max-w-4xl space-y-6 p-4 text-sm text-gray-900 dark:text-gray-100">
+      <div className="w-full max-w-none space-y-6 p-4 text-sm text-gray-900 dark:text-gray-100">
         <div className="flex items-center gap-3">
           <button onClick={() => setSelectedReq(null)} className="rounded-full p-2 hover:bg-gray-200 dark:hover:bg-gray-800">
             <ArrowLeft size={22} />
@@ -221,7 +221,7 @@ export default function ApprovalDashboard() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5 p-4">
+    <div className="w-full max-w-none space-y-5 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>

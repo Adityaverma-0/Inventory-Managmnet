@@ -1,6 +1,8 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
+import { CheckCircle, List, Warehouse, Truck, Package, Users, Receipt, FileUp, Database } from 'lucide-react';
+
 import Login from './features/auth/Login';
 import ApprovalDashboard from './features/admin/ApprovalDashboard';
 import AuditLog from './features/admin/AuditLog';
@@ -12,7 +14,6 @@ import PurchaseWorkflow from './features/admin/PurchaseWorkflow';
 import InventoryImport from './features/admin/InventoryImport';
 import ManualStockPage from './features/admin/ManualStockPage';
 
-import { Link } from 'react-router-dom';
 import './App.css';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -22,11 +23,18 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const navClass = ({ isActive }: { isActive: boolean }) => 
+  `flex items-center gap-3 px-4 py-2 rounded ${
+    isActive 
+      ? "bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200 font-medium" 
+      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+  }`;
+
 function AdminLayout({ children }: { children: React.ReactNode }) {
   const { logout, user } = useAuth();
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
-      <header className="bg-white dark:bg-gray-800 shadow p-4 flex justify-between items-center">
+      <header className="bg-white dark:bg-gray-800 shadow px-4 py-4 md:px-8 md:py-6 flex justify-between items-center">
         <h1 className="text-xl font-bold dark:text-white">Admin Panel</h1>
         <div className="flex items-center gap-4">
           <span className="text-sm dark:text-gray-300">Welcome, {user?.username}</span>
@@ -36,15 +44,15 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col md:flex-row flex-1">
         <aside className="w-full md:w-64 md:shrink-0 bg-white dark:bg-gray-800 shadow-sm border-r dark:border-gray-700">
           <nav className="p-4 flex flex-wrap md:block md:space-y-2">
-            <Link to="/" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Approvals</Link>
-            <Link to="/audit" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Audit Log</Link>
-            <Link to="/godowns" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Godowns</Link>
-            <Link to="/vehicles" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Vehicles</Link>
-            <Link to="/products" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Products</Link>
-            <Link to="/salesmen" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Salesmen</Link>
-            <Link to="/purchase" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Purchases (Receipts)</Link>
-            <Link to="/inventory/import" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Inventory PDF Import</Link>
-            <Link to="/manual-stock" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Manual Stock Add</Link>
+            <NavLink to="/" className={navClass}><CheckCircle size={18} /> Approvals</NavLink>
+            <NavLink to="/audit" className={navClass}><List size={18} /> Audit Log</NavLink>
+            <NavLink to="/godowns" className={navClass}><Warehouse size={18} /> Godowns</NavLink>
+            <NavLink to="/vehicles" className={navClass}><Truck size={18} /> Vehicles</NavLink>
+            <NavLink to="/products" className={navClass}><Package size={18} /> Products</NavLink>
+            <NavLink to="/salesmen" className={navClass}><Users size={18} /> Salesmen</NavLink>
+            <NavLink to="/purchase" className={navClass}><Receipt size={18} /> Purchases (Receipts)</NavLink>
+            <NavLink to="/inventory/import" className={navClass}><FileUp size={18} /> Inventory PDF Import</NavLink>
+            <NavLink to="/manual-stock" className={navClass}><Database size={18} /> Manual Stock Add</NavLink>
           </nav>
         </aside>
         <main className="flex-1 min-w-0 p-4 md:p-6 overflow-auto">
