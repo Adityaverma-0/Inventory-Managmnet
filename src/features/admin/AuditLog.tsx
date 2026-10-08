@@ -47,12 +47,12 @@ export default function AuditLog() {
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {logs.map((log) => (
               <tr key={log.id} className="dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-                <td className="px-6 py-4">{new Date(log.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
-                <td className="px-6 py-4">{log.admin_username}</td>
+                <td className="px-6 py-4">{new Date(Number(log.timestamp)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
+                <td className="px-6 py-4">{log.details?.actor_id || log.admin_username || 'Not recorded'}</td>
                 <td className="px-6 py-4 font-semibold">{log.action}</td>
                 <td className="px-6 py-4">{log.entity}</td>
-                <td className="px-6 py-4">{log.entity_id}</td>
-                <td className="px-6 py-4 truncate max-w-xs" title={log.details}>{log.details}</td>
+                <td className="px-6 py-4">{log.entity_id || log.entity || '—'}</td>
+                <td className="px-6 py-4 truncate max-w-xs" title={JSON.stringify(log.details)}>{JSON.stringify(log.details)}</td>
               </tr>
             ))}
           </tbody>

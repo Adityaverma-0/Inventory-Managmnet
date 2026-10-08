@@ -1,0 +1,256 @@
+import express from 'express';
+import cors from 'cors';
+import pg from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const { Pool } = pg;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
+
+// Helper for quick audit logging
+async function logAudit(client, action, entity, details) {
+  await client.query(
+    'INSERT INTO audit_log (id, timestamp, action, entity, details) VALUES ($1, $2, $3, $4, $5)',
+    [Date.now().toString(), Date.now(), action, entity, details]
+  );
+}
+
+// Ensure connection checks on boot
+pool.query('SELECT NOW()').then(() => console.log('Connected to Neon Database!')).catch(e => console.error('DB Connection Error:', e.message));
+
+app.post('/api/v2/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === 'admin') {
+    res.json({ token: 'mock-admin-token', user: { id: 'admin1', username: 'admin', role: 'admin' } });
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+});
+
+app.get('/api/v2/admin/:table(godowns|products|salesmen|vehicles)', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM ${req.params.table}`);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v2/admin/:table(godowns|products|salesmen|vehicles)', async (req, res) => {
+  const table = req.params.table;
+  const id = `rec_${Date.now()}`;
+  const keys = Object.keys(req.body);
+  const vals = Object.values(req.body);
+
+  keys.push('id');
+  vals.push(id);
+
+  const placeholders = vals.map((_, i) => `$${i + 1}`).join(', ');
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+      vals
+    );
+    await logAudit(pool, `CREATE_${table.toUpperCase()}`, id, req.body);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/v2/admin/:table(godowns|products|salesmen|vehicles)/:id', async (req, res) => {
+  const { table, id } = req.params;
+  const keys = Object.keys(req.body);
+  const vals = Object.values(req.body);
+  const setClauses = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+  try {
+    const { rows } = await pool.query(
+      `UPDATE ${table} SET ${setClauses} WHERE id = $${vals.length + 1} RETURNING *`,
+      [...vals, id]
+    );
+    await logAudit(pool, `UPDATE_${table.toUpperCase()}`, id, req.body);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/v2/admin/:location_type(godowns|vehicles)/:id/stock', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const query = `
+      SELECT p.id as product_id, p.name as product_name, p.price_paise,
+             p.pieces_per_box, p.strips_per_box, p.units_per_strip,
+             COALESCE(SUM(
+               CASE
+                 WHEN l.type IN ('LOAD_IN', 'ADJ_PLUS') THEN l.quantity_pieces
+                 WHEN l.type IN ('LOAD_OUT', 'ADJ_MINUS', 'SALE') THEN -l.quantity_pieces
+                 ELSE 0
+               END
+             ), 0) as quantity_pieces
+      FROM products p
+      LEFT JOIN stock_ledger l ON p.id = l.product_id AND l.location_id = $1
+      GROUP BY p.id, p.name, p.price_paise, p.pieces_per_box, p.strips_per_box, p.units_per_strip
+      HAVING COALESCE(SUM(
+               CASE
+                 WHEN l.type IN ('LOAD_IN', 'ADJ_PLUS') THEN l.quantity_pieces
+                 WHEN l.type IN ('LOAD_OUT', 'ADJ_MINUS', 'SALE') THEN -l.quantity_pieces
+                 ELSE 0
+               END
+             ), 0) > 0
+    `;
+    const { rows } = await pool.query(query, [id]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/v2/admin/:location_type(godowns|vehicles)/:id/history', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      'SELECT * FROM stock_ledger WHERE location_id = $1 ORDER BY timestamp DESC LIMIT 100',
+      [id]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v2/admin/purchases', async (req, res) => {
+  const { invoice_ref, godown_id, lines } = req.body;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const purchaseId = `pur_${Date.now()}`;
+    await client.query(
+      'INSERT INTO purchases (id, timestamp, invoice_ref, godown_id) VALUES ($1, $2, $3, $4)',
+      [purchaseId, Date.now(), invoice_ref, godown_id]
+    );
+
+    for (const line of lines) {
+      await client.query(
+        'INSERT INTO purchase_lines (purchase_id, product_id, quantity_pieces) VALUES ($1, $2, $3)',
+        [purchaseId, line.product_id, line.quantity_pieces]
+      );
+
+      const ledgerId = `led_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      await client.query(
+        'INSERT INTO stock_ledger (id, timestamp, type, product_id, quantity_pieces, location_id, reason, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [ledgerId, Date.now(), 'LOAD_IN', line.product_id, line.quantity_pieces, godown_id, 'PURCHASE_RECEIPT', `Inv: ${invoice_ref}`]
+      );
+    }
+
+    await logAudit(client, 'PURCHASE_RECEIPT', invoice_ref, req.body);
+    await client.query('COMMIT');
+    res.json({ id: purchaseId, success: true });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/v2/admin/stock/adjust', async (req, res) => {
+  const { godown_id, product_id, quantity_pieces, kind, reason, note } = req.body;
+  try {
+    const ledgerId = `adj_${Date.now()}`;
+    const { rows } = await pool.query(
+      'INSERT INTO stock_ledger (id, timestamp, type, product_id, quantity_pieces, location_id, reason, note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [ledgerId, Date.now(), kind === 'IN' || kind === 'ADJ_PLUS' ? 'ADJ_PLUS' : 'ADJ_MINUS', product_id, quantity_pieces, godown_id, reason, note]
+    );
+    await logAudit(pool, 'STOCK_ADJUSTMENT', ledgerId, req.body);
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/v2/admin/audit', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT 200');
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/v2/unload-requests', async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM work_days WHERE state IN ('UNLOAD_REQUESTED', 'SENT_BACK')");
+    res.json(rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/v2/salesman/login', async (req, res) => {
+  const { mobile, pin } = req.body;
+  // Mock PIN validation but check against real salesman table
+  try {
+    const { rows } = await pool.query('SELECT * FROM salesmen WHERE phone = $1', [mobile]);
+    if (rows.length > 0 && pin === '1234') {
+      res.json({ token: 'mock-salesman-token', user: rows[0] });
+    } else if (mobile === '9999999999' && pin === '1234') {
+      res.json({ token: 'mock-salesman-token', user: { id: 's1', name: 'Test Salesman', phone: '9999999999' } });
+    } else {
+      res.status(401).json({ error: 'Invalid mobile or PIN' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/v2/unload-requests', async (req, res) => {
+  const { workDayId, cashCollectedPaise, heldItems, unloadedItems, cashBreakdown, noteCount, coinCount, salesmanId, vehicleId, calendarDate } = req.body;
+  try {
+    // Upsert the workday state
+    await pool.query(`
+      INSERT INTO work_days (work_day_id, calendar_date, state, salesman_id, vehicle_id, cash_collected_paise)
+      VALUES ($1, $2, 'UNLOAD_REQUESTED', $3, $4, $5)
+      ON CONFLICT (work_day_id) DO UPDATE SET
+        state = 'UNLOAD_REQUESTED',
+        cash_collected_paise = EXCLUDED.cash_collected_paise
+    `, [workDayId, calendarDate || new Date().toISOString().split('T')[0], salesmanId, vehicleId, cashCollectedPaise]);
+
+    await logAudit(pool, 'UNLOAD_REQUESTED', workDayId, req.body);
+    res.json({ success: true, state: 'UNLOAD_REQUESTED' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/v2/unload-requests/:id', async (req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT * FROM work_days WHERE work_day_id = $1", [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ status: rows[0].state, adminNote: rows[0].admin_note });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/v2/unload-requests/:id/approve', async (req, res) => {
+  try {
+    await pool.query("UPDATE work_days SET state = 'APPROVED' WHERE work_day_id = $1", [req.params.id]);
+    await logAudit(pool, 'UNLOAD_APPROVED', req.params.id, {});
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/v2/unload-requests/:id/send-back', async (req, res) => {
+  try {
+    const { note } = req.body;
+    await pool.query("UPDATE work_days SET state = 'SENT_BACK', admin_note = $2 WHERE work_day_id = $1", [req.params.id, note]);
+    await logAudit(pool, 'UNLOAD_SENT_BACK', req.params.id, { note });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+const PORT = 8000;
+app.listen(PORT, () => console.log(`Backend API Server running on port ${PORT}`));

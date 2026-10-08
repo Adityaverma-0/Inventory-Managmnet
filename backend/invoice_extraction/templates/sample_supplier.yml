@@ -1,0 +1,10 @@
+issuer: Sample Supplier
+keywords:
+  - Sample Purchase Invoice
+required_fields: []
+fields:
+  invoice_number: 'Sample Purchase Invoice'
+lines:
+  start: 'Item Name\s+Qty\s+Price'
+  end: '\f'
+  line: '^(?P<item>.*?)\s+(?P<qty>\d+)\s+(?P<line_amount>\d+)$'

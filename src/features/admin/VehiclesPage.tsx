@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useApi } from '../auth/useApi';
 import { formatRupees } from '../../domain/money';
 import { formatQuantity } from '../../domain/units';
@@ -9,6 +9,8 @@ const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/
 // WHAT: vehicles CRUD + per-vehicle monitoring (stock, assigned salesman, movement).
 export default function VehiclesPage() {
   const fetchApi = useApi();
+  const saving = useRef(false);
+  const [busy, setBusy] = useState(false);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [godowns, setGodowns] = useState<any[]>([]);
   const [salesmen, setSalesmen] = useState<any[]>([]);
@@ -23,9 +25,9 @@ export default function VehiclesPage() {
   const load = useCallback(async () => {
     try {
       const [v, g, s] = await Promise.all([
-        fetchApi(`${API_URL}/admin/vehicles`).then(r => r.json()),
-        fetchApi(`${API_URL}/admin/godowns`).then(r => r.json()),
-        fetchApi(`${API_URL}/admin/salesmen`).then(r => r.json()),
+        fetchApi(`${API_URL}/admin/vehicles`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
+        fetchApi(`${API_URL}/admin/godowns`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
+        fetchApi(`${API_URL}/admin/salesmen`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
       ]);
       setVehicles(v); setGodowns(g); setSalesmen(s);
     } catch (e: any) { setError(e.message); }
@@ -33,11 +35,13 @@ export default function VehiclesPage() {
 
   const loadDetail = useCallback(async (id: string) => {
     if (!id) return;
+    try {
     const [s, h] = await Promise.all([
-      fetchApi(`${API_URL}/admin/vehicles/${id}/stock`).then(r => r.json()),
-      fetchApi(`${API_URL}/admin/vehicles/${id}/history`).then(r => r.json()),
+      fetchApi(`${API_URL}/admin/vehicles/${id}/stock`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
+      fetchApi(`${API_URL}/admin/vehicles/${id}/history`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
     ]);
     setStock(s); setHistory(h);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not load stock.'); }
   }, [fetchApi]);
 
   useEffect(() => { load(); }, [load]);
@@ -49,12 +53,17 @@ export default function VehiclesPage() {
   const selectedVehicle = vehicles.find(v => v.id === selected);
 
   const save = async () => {
+    if (saving.current) return;
+    saving.current = true; setBusy(true);
+    try {
     if (!name || !godownId) return setError('Name and godown required');
     const res = editId
       ? await fetchApi(`${API_URL}/admin/vehicles/${editId}`, { method: 'PUT', body: JSON.stringify({ name, godown_id: godownId }) })
       : await fetchApi(`${API_URL}/admin/vehicles`, { method: 'POST', body: JSON.stringify({ name, godown_id: godownId }) });
     if (!res.ok) return setError((await res.json()).error || 'Save failed');
     setName(''); setGodownId(''); setEditId(''); await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.'); }
+    finally { saving.current = false; setBusy(false); }
   };
 
   return (
@@ -69,7 +78,7 @@ export default function VehiclesPage() {
             <option value="">Select godown (location comes from godown)</option>
             {godowns.map(g => <option key={g.id} value={g.id}>{g.name} — {g.location_name}</option>)}
           </select>
-          <button onClick={save} className="bg-blue-600 text-white rounded px-4 py-2">{editId ? 'Update' : 'Add'}</button>
+          <button disabled={busy} onClick={save} className="bg-blue-600 text-white rounded px-4 py-2">{editId ? 'Update' : 'Add'}</button>
           {editId && <button onClick={() => { setEditId(''); setName(''); setGodownId(''); }} className="border rounded px-4 py-2">Cancel</button>}
         </div>
         <table className="min-w-full text-sm">
@@ -107,7 +116,7 @@ export default function VehiclesPage() {
               <tr key={r.id} className="border-t dark:border-gray-700">
                 <td className="p-2">{formatDateTimeIST(r.timestamp ?? r.created_at)}</td>
                 <td className="p-2">{r.type}</td>
-                <td className="p-2">{r.product_id}</td>
+                <td className="p-2">{r.product_name || r.product_id}</td>
                 <td className="p-2">{r.quantity_pieces}</td>
                 <td className="p-2">{r.reason || '-'}</td>
               </tr>

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { AuthProvider, useAuth } from './AuthContext';
 
@@ -15,8 +15,8 @@ function TestComponent() {
 }
 
 describe('AuthContext', () => {
-  beforeEach(() => localStorage.clear());
-  afterEach(() => localStorage.clear());
+  beforeEach(() => { localStorage.clear(); vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) })); });
+  afterEach(() => { localStorage.clear(); vi.unstubAllGlobals(); });
 
   it('provides default empty state and handles login/logout', () => {
     render(<AuthProvider><TestComponent /></AuthProvider>);

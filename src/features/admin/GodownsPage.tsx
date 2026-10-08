@@ -20,28 +20,42 @@ export default function GodownsPage() {
   const [tab, setTab] = useState<'stock' | 'history' | 'add' | 'adjust'>('stock');
   const [name, setName] = useState(''); const [location, setLocation] = useState('');
   const [editId, setEditId] = useState('');
+  const [active, setActive] = useState(true);
   const [search, setSearch] = useState('');
   const [histSearch, setHistSearch] = useState('');
 
   const load = useCallback(async () => {
     try {
       const [g, p] = await Promise.all([fetchApi(`${API_URL}/admin/godowns`), fetchApi(`${API_URL}/admin/products`)]);
-      setGodowns(await g.json()); setProducts(await p.json());
+      const [gs, ps] = await Promise.all([g.json(), p.json()]);
+      if (!g.ok || !p.ok || !Array.isArray(gs) || !Array.isArray(ps)) throw new Error('Could not load products and godowns.');
+      setGodowns(gs); setProducts(ps);
     } catch (e: any) { setError(e.message); }
   }, [fetchApi]);
 
   const loadStock = useCallback(async (id: string) => {
     if (!id) { setStock([]); setHistory([]); return; }
+    try {
     const [s, h] = await Promise.all([
       fetchApi(`${API_URL}/admin/godowns/${id}/stock`),
       fetchApi(`${API_URL}/admin/godowns/${id}/history`),
     ]);
-    setStock(await s.json()); setHistory(await h.json());
+    const [stockRows, historyRows] = await Promise.all([s.json(), h.json()]);
+    if (!s.ok || !h.ok || !Array.isArray(stockRows) || !Array.isArray(historyRows)) throw new Error('Could not refresh inventory.');
+    setStock(stockRows); setHistory(historyRows);
+    } catch (e: any) { setError(e.message); }
   }, [fetchApi]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (godowns.length && !selected) setSelected(godowns[0].id); }, [godowns, selected]);
   useEffect(() => { void loadStock(selected); }, [selected, loadStock]);
+
+  useEffect(() => {
+    const refresh = () => { void load(); void loadStock(selected); };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('inventory-updated', refresh);
+    return () => { window.removeEventListener('focus', refresh); window.removeEventListener('inventory-updated', refresh); };
+  }, [load, loadStock, selected]);
 
   const toProduct = (row: any) => ({ id: row.product_id, name: row.product_name, pricePaise: row.price_paise ?? 0, unitsPerStrip: row.units_per_strip, stripsPerBox: row.strips_per_box, piecesPerBox: row.pieces_per_box });
 
@@ -52,11 +66,13 @@ export default function GodownsPage() {
 
   const saveGodown = async () => {
     if (!name || !location) return setError('Name and location required');
+    try {
     const res = editId
-      ? await fetchApi(`${API_URL}/admin/godowns/${editId}`, { method: 'PUT', body: JSON.stringify({ name, location_name: location }) })
-      : await fetchApi(`${API_URL}/admin/godowns`, { method: 'POST', body: JSON.stringify({ name, location_name: location }) });
+      ? await fetchApi(`${API_URL}/admin/godowns/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, location_name: location, active }) })
+      : await fetchApi(`${API_URL}/admin/godowns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, location_name: location, active }) });
     if (!res.ok) return setError((await res.json()).error || 'Save failed');
-    setName(''); setLocation(''); setEditId(''); await load();
+    setName(''); setLocation(''); setEditId(''); setActive(true); await load();
+    } catch (e: any) { setError(e.message || 'Could not save godown.'); }
   };
 
   return (
@@ -68,18 +84,19 @@ export default function GodownsPage() {
         <div className="flex flex-wrap gap-2">
           <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="Godown name" value={name} onChange={e => setName(e.target.value)} />
           <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="Location (e.g. Hardpiplya/Dewas)" value={location} onChange={e => setLocation(e.target.value)} />
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} /> Active</label>
           <button onClick={saveGodown} className="bg-blue-600 text-white rounded px-4 py-2">{editId ? 'Update' : 'Add'}</button>
-          {editId && <button onClick={() => { setEditId(''); setName(''); setLocation(''); }} className="border rounded px-4 py-2">Cancel</button>}
+          {editId && <button onClick={() => { setEditId(''); setName(''); setLocation(''); setActive(true); }} className="border rounded px-4 py-2">Cancel</button>}
         </div>
         <table className="min-w-full text-sm">
           <thead className="text-left text-gray-500"><tr><th className="p-2">Name</th><th className="p-2">Location</th><th className="p-2"></th></tr></thead>
           <tbody>{godowns.map(g => (
             <tr key={g.id} className="border-t dark:border-gray-700">
               <td className="p-2">
-                <button className={selected === g.id ? 'text-blue-600 font-bold' : ''} onClick={() => setSelected(g.id)}>{g.name}</button>
+                <button className={selected === g.id ? 'text-blue-600 font-bold' : ''} onClick={() => setSelected(g.id)}>{g.name}{g.active === false ? ' (Inactive)' : ''}</button>
               </td>
               <td className="p-2">{g.location_name}</td>
-              <td className="p-2 text-right"><button className="text-blue-600" onClick={() => { setEditId(g.id); setName(g.name); setLocation(g.location_name); }}>Edit</button></td>
+              <td className="p-2 text-right"><button className="text-blue-600" onClick={() => { setEditId(g.id); setName(g.name); setLocation(g.location_name); setActive(g.active !== false); }}>Edit</button></td>
             </tr>
           ))}</tbody>
         </table>
@@ -121,7 +138,7 @@ export default function GodownsPage() {
               <tr key={r.id} className="border-t dark:border-gray-700">
                 <td className="p-2">{formatDateTimeIST(r.timestamp ?? r.created_at)}</td>
                 <td className="p-2">{r.type}</td>
-                <td className="p-2">{r.product_id}</td>
+                <td className="p-2">{r.product_name || r.product_id}</td>
                 <td className="p-2">{r.quantity_pieces}</td>
                 <td className="p-2">{r.reason || '-'}</td>
               </tr>
@@ -139,6 +156,7 @@ export default function GodownsPage() {
 function StockEntryForm({ mode, godowns, products, selectedGodown, onDone }: any) {
   const fetchApi = useApi();
   const [godownId, setGodownId] = useState(selectedGodown || '');
+  useEffect(() => { setGodownId(selectedGodown || ''); }, [selectedGodown]);
   const [productId, setProductId] = useState('');
   const [amount, setAmount] = useState('');
   const [unit, setUnit] = useState<'BOX' | 'STRIP' | 'PIECE'>('BOX');
@@ -151,6 +169,7 @@ function StockEntryForm({ mode, godowns, products, selectedGodown, onDone }: any
   const product = products.find((p: any) => p.id === productId);
 
   const submit = async () => {
+    try {
     if (!godownId || !productId || !reason || !Number(amount)) return setError('All fields except note are required');
     const pieces = Number(amount) * (unit === 'BOX' ? product?.pieces_per_box ?? 1 : unit === 'STRIP' ? product?.units_per_strip ?? 1 : 1);
     const res = await fetchApi(`${API_URL}/admin/stock/adjust`, {
@@ -161,6 +180,7 @@ function StockEntryForm({ mode, godowns, products, selectedGodown, onDone }: any
     if (!res.ok) return setError(body.error || 'Failed');
     onDone();
     setAmount(''); setNote(''); setReason('');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not update stock.'); }
   };
 
   return (

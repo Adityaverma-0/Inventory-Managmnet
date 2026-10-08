@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { DayStockReportRow } from '../../domain/types';
-import { productMap } from '../../data/seedData';
+import { Product } from '../../domain/types';
 import { formatQuantity } from '../../domain/units';
 import { Download, Printer, Check, ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -38,8 +38,8 @@ export default function StockReconcileTable({
 
   const renderQty = (qty: number, productId: string) => {
     if (unitMode === 'PIECES') return `${qty}`;
-    const p = productMap.get(productId)!;
-    return formatQuantity(qty, p);
+    const p = (report.find(r => r.productId === productId) as (DayStockReportRow & {product?:Product}) | undefined)?.product;
+    return p ? formatQuantity(qty, p) : `${qty} Pieces`;
   };
 
   const totals = useMemo(() => {

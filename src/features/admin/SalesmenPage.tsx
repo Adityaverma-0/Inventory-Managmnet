@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useApi } from '../auth/useApi';
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2';
 
-// WHAT: salesmen CRUD + PIN management. Work-day open/close is NOT tracked in
-// the admin database, so that is stated honestly rather than enforced.
+// Salesman assignments and credential updates are validated by the server.
 export default function SalesmenPage() {
   const fetchApi = useApi();
+  const saving = useRef(false);
+  const [busy, setBusy] = useState(false);
   const [salesmen, setSalesmen] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [godowns, setGodowns] = useState<any[]>([]);
@@ -16,6 +17,7 @@ export default function SalesmenPage() {
   const [location, setLocation] = useState('');
   const [vehicleId, setVehicleId] = useState('');
   const [status, setStatus] = useState('ACTIVE');
+  const [password, setPassword] = useState('');
   const [editId, setEditId] = useState('');
   const [pinTarget, setPinTarget] = useState('');
   const [pin, setPin] = useState('');
@@ -24,9 +26,9 @@ export default function SalesmenPage() {
   const load = useCallback(async () => {
     try {
       const [s, v, g] = await Promise.all([
-        fetchApi(`${API_URL}/admin/salesmen`).then(r => r.json()),
-        fetchApi(`${API_URL}/admin/vehicles`).then(r => r.json()),
-        fetchApi(`${API_URL}/admin/godowns`).then(r => r.json()),
+        fetchApi(`${API_URL}/admin/salesmen`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
+        fetchApi(`${API_URL}/admin/vehicles`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
+        fetchApi(`${API_URL}/admin/godowns`).then(async r => { const data = await r.json(); if (!r.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load records.'); return data; }),
       ]);
       setSalesmen(s); setVehicles(v); setGodowns(g);
     } catch (e: any) { setError(e.message); }
@@ -39,34 +41,41 @@ export default function SalesmenPage() {
   const locations = useMemo(() => Array.from(new Set(godowns.map(g => g.location_name))), [godowns]);
 
   const save = async () => {
-    if (!name || !mobile || !location) return setError('Name, mobile and location are required');
+    if (saving.current) return;
+    saving.current = true; setBusy(true);
+    try {
+    if (!name || !mobile || !location || (!editId && !password)) return setError('Name, mobile, location, and password (for new salesman) are required');
     const res = editId
-      ? await fetchApi(`${API_URL}/admin/salesmen/${editId}`, { method: 'PUT', body: JSON.stringify({ name, mobile, location_name: location, vehicle_id: vehicleId || null, status }) })
-      : await fetchApi(`${API_URL}/admin/salesmen`, { method: 'POST', body: JSON.stringify({ name, mobile, location_name: location, vehicle_id: vehicleId || null, status }) });
+      ? await fetchApi(`${API_URL}/admin/salesmen/${editId}`, { method: 'PUT', body: JSON.stringify({ name, mobile, location_name: location, vehicle_id: vehicleId || null, status, ...(password ? {password} : {}) }) })
+      : await fetchApi(`${API_URL}/admin/salesmen`, { method: 'POST', body: JSON.stringify({ name, mobile, location_name: location, vehicle_id: vehicleId || null, status, ...(password ? {password} : {}) }) });
     const body = await res.json();
     if (!res.ok) return setError(body.error || 'Save failed');
     if (body.warning) setWarning(body.warning);
-    setName(''); setMobile(''); setLocation(''); setVehicleId(''); setStatus('ACTIVE'); setEditId(''); await load();
+    setName(''); setMobile(''); setLocation(''); setVehicleId(''); setStatus('ACTIVE'); setPassword(''); setEditId(''); await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not save.'); }
+    finally { saving.current = false; setBusy(false); }
   };
 
   const applyPin = async () => {
-    if (!pinTarget || !/^\d{4,6}$/.test(pin)) return setError('Choose a salesman and enter 4-6 digit PIN');
+    try {
+    if (!pinTarget || pin.length < 8) return setError('Choose a salesman and enter a password with at least 8 characters');
     const res = await fetchApi(`${API_URL}/admin/salesmen/${pinTarget}/set-pin`, { method: 'POST', body: JSON.stringify({ pin }) });
     const body = await res.json();
     if (!res.ok) return setError(body.error || 'PIN set failed');
-    setPin(''); alert('PIN saved (shown only once). The PIN itself is never stored or displayed.');
+    setPin(''); alert('Password updated.');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not update password.'); }
   };
 
   const resetPin = async (id: string) => {
-    await fetchApi(`${API_URL}/admin/salesmen/${id}/reset-pin`, { method: 'POST', body: JSON.stringify({}) });
-    alert('PIN cleared'); await load();
+    setPinTarget(id); setPin('');
+    setError('Enter a new password in the reset form below, then save it.');
   };
 
   return (
     <div className="space-y-4 dark:text-gray-100">
       <h2 className="text-2xl font-bold">Salesmen</h2>
       {error && <p className="text-red-600">{error}</p>}
-      {warning && <p className="text-amber-600 text-sm">{warning} — Note: open work-day enforcement is not possible because the admin database does not store work-day state. This only warns about pending unload requests or remaining vehicle stock.</p>}
+      {warning && <p className="text-amber-600 text-sm">{warning}</p>}
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
         <h3 className="font-bold">Add / edit salesman</h3>
@@ -79,24 +88,25 @@ export default function SalesmenPage() {
           <select className="border dark:border-gray-600 bg-transparent rounded p-2" value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
             <option value="">Vehicle (optional)</option>{vehiclesForLocation.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
+          <input type="password" className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder={editId ? 'New Password (optional)' : 'Password'} value={password} onChange={e => setPassword(e.target.value)} />
           <select className="border dark:border-gray-600 bg-transparent rounded p-2" value={status} onChange={e => setStatus(e.target.value)}>
             <option>ACTIVE</option><option>ON_HOLD</option><option>INACTIVE</option>
           </select>
-          <button onClick={save} className="bg-blue-600 text-white rounded px-4 py-2">{editId ? 'Update' : 'Add'}</button>
-          {editId && <button onClick={() => { setEditId(''); setName(''); setMobile(''); setLocation(''); setVehicleId(''); setStatus('ACTIVE'); }} className="border rounded px-4 py-2">Cancel</button>}
+          <button disabled={busy} onClick={save} className="bg-blue-600 text-white rounded px-4 py-2">{editId ? 'Update' : 'Add'}</button>
+          {editId && <button onClick={() => { setEditId(''); setName(''); setMobile(''); setLocation(''); setVehicleId(''); setStatus('ACTIVE'); setPassword(''); }} className="border rounded px-4 py-2">Cancel</button>}
         </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
-        <h3 className="font-bold">Set / reset PIN</h3>
+        <h3 className="font-bold">Set / reset password</h3>
         <div className="flex flex-wrap gap-2">
           <select className="border dark:border-gray-600 bg-transparent rounded p-2" value={pinTarget} onChange={e => setPinTarget(e.target.value)}>
             <option value="">Select salesman</option>{salesmen.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="New 4-6 digit PIN" value={pin} onChange={e => setPin(e.target.value)} />
-          <button onClick={applyPin} className="bg-blue-600 text-white rounded px-4 py-2">Set PIN</button>
+          <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="New password (8+ characters)" value={pin} onChange={e => setPin(e.target.value)} />
+          <button onClick={applyPin} className="bg-blue-600 text-white rounded px-4 py-2">Set password</button>
         </div>
-        <p className="text-xs text-gray-500">The PIN is bcrypt-hashed on the server and is never returned by any API, stored in the audit log, or displayed again.</p>
+        <p className="text-xs text-gray-500">The PIN is scrypt-hashed on the server and is never returned by any API, stored in the audit log, or displayed again.</p>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -111,7 +121,7 @@ export default function SalesmenPage() {
               <td className="p-2">{s.status}</td>
               <td className="p-2 text-right">
                 <button className="text-blue-600 mr-3" onClick={() => { setEditId(s.id); setName(s.name); setMobile(s.mobile); setLocation(s.location_name); setVehicleId(s.vehicle_id || ''); setStatus(s.status); }}>Edit</button>
-                <button className="text-red-600" onClick={() => resetPin(s.id)}>Reset PIN</button>
+                <button className="text-red-600" onClick={() => resetPin(s.id)}>Reset password</button>
               </td>
             </tr>
           ))}</tbody>

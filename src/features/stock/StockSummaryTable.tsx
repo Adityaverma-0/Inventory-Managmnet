@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { DayStockReportRow } from '../../domain/types';
-import { productMap } from '../../data/seedData';
+
 import { formatQuantity } from '../../domain/units';
 import { CheckCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatRupees } from '../../domain/money';
@@ -120,7 +120,7 @@ const StockSummaryTable = React.memo(({ report, isPending = false, printMode = '
       <div className="text-[11px] font-mono leading-tight">
         <div className="font-bold border-b border-black border-dashed pb-1 mb-1 text-center">STOCK SUMMARY</div>
         {sorted.map(row => {
-          const product = productMap.get(row.productId) || defaultProduct;
+          const product = (row as DayStockReportRow & { product?: typeof defaultProduct }).product || defaultProduct;
           const startPieces = (row.startFromHeldPieces || 0) + (row.startLoadedPieces || 0);
           const soldPieces = row.soldPieces || 0;
           const remGodown = row.remainingToGodownPieces || 0;
@@ -169,7 +169,7 @@ const StockSummaryTable = React.memo(({ report, isPending = false, printMode = '
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {sorted.map(row => {
-              const product = productMap.get(row.productId) || defaultProduct;
+              const product = (row as DayStockReportRow & { product?: typeof defaultProduct }).product || defaultProduct;
               const price = row.priceSnapshotPaise || 0;
               const startHeld = row.startFromHeldPieces || 0;
               const startLoaded = row.startLoadedPieces || 0;

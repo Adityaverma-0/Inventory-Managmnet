@@ -1,0 +1,4 @@
+invoice2data==1.0.1
+pdfminer.six==20260107
+pypdfium2==5.14.0
+Pillow==12.3.0

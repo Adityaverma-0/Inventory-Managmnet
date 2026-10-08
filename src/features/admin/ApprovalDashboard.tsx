@@ -46,7 +46,7 @@ export default function ApprovalDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchApi]);
 
   useEffect(() => {
     void refresh();
@@ -122,7 +122,7 @@ export default function ApprovalDashboard() {
     const billCounts = day.billCounts || { Cash: 0, UPI: 0, Credit: 0 };
     const isPending = reqObj.status === 'PENDING' || reqObj.status === 'SENT_BACK';
     const cashDiff = day.cashCollected - totals.cash;
-    
+
     return (
       <div className="mx-auto max-w-4xl space-y-6 p-4 text-sm text-gray-900 dark:text-gray-100">
         <div className="flex items-center gap-3">
@@ -186,11 +186,11 @@ export default function ApprovalDashboard() {
 
         {/* 3. Cash received table */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded">
-          <CashBreakdownTable 
-            breakdown={day.cashDenominationBreakdown || {}} 
-            totalPaise={day.cashCollected} 
-            noteCount={day.cashDenominationBreakdown ? Object.values(day.cashDenominationBreakdown).reduce((a:any,b:any)=>a+b,0) as number : 0} 
-            coinCount={0} 
+          <CashBreakdownTable
+            breakdown={day.cashDenominationBreakdown || {}}
+            totalPaise={day.cashCollected}
+            noteCount={Object.entries(day.cashDenominationBreakdown || {}).filter(([key]) => key.startsWith('NOTE_')).reduce((total, [, count]) => total + Number(count), 0)}
+            coinCount={Object.entries(day.cashDenominationBreakdown || {}).filter(([key]) => key.startsWith('COIN_')).reduce((total, [, count]) => total + Number(count), 0)}
           />
         </div>
 

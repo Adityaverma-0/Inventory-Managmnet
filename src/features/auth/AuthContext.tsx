@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 interface User {
   id: string;
@@ -7,6 +7,7 @@ interface User {
 }
 
 interface AuthContextType {
+  loading: boolean;
   user: User | null;
   token: string | null;
   login: (token: string, user: User) => void;
@@ -16,34 +17,44 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const storedToken = localStorage.getItem('admin_token');
-    const storedUser = localStorage.getItem('admin_user');
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
+    if (!storedToken) { setLoading(false); return; }
+    void fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2'}/session`, {headers:{Authorization:`Bearer ${storedToken}`}})
+      .then(async response => {
+        if (!response.ok) throw new Error('Invalid session');
+        const data = await response.json();
+        if (!cancelled && data.user.role === 'admin') {
+          setToken(storedToken); setUser({...data.user,username:data.user.username || 'admin'});
+        }
+      }).catch(() => { if (!cancelled) { localStorage.removeItem('admin_token'); localStorage.removeItem('admin_user'); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  const login = (newToken: string, newUser: User) => {
+  const login = useCallback((newToken: string, newUser: User) => {
     localStorage.setItem('admin_token', newToken);
     localStorage.setItem('admin_user', JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    const saved = localStorage.getItem('admin_token');
+    if (saved) void fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2'}/logout`, { method: 'POST', headers: { Authorization: `Bearer ${saved}` } }).catch(() => {});
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
     setToken(null);
     setUser(null);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

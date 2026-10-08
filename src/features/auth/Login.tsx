@@ -16,7 +16,7 @@ export default function Login() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:8000/api/v2/admin/login', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2'}/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -30,8 +30,8 @@ export default function Login() {
 
       login(data.token, data.user);
       navigate('/');
-    } catch (err) {
-      setError('Network error');
+    } catch {
+      setError('Could not reach the server. Please retry.');
     }
   };
 

@@ -17,9 +17,10 @@ export default function ProductsPage() {
   const [active, setActive] = useState(true);
   const [editId, setEditId] = useState('');
   const [search, setSearch] = useState('');
+  const [metadata, setMetadata] = useState({ sku: '', barcode: '', hsn: '', uom: '' });
 
   const load = useCallback(async () => {
-    try { const res = await fetchApi(`${API_URL}/admin/products`); setProducts(await res.json()); }
+    try { const res = await fetchApi(`${API_URL}/admin/products`); const data = await res.json(); if (!res.ok || !Array.isArray(data)) throw new Error(data.error || 'Could not load products.'); setProducts(data); }
     catch (e: any) { setError(e.message); }
   }, [fetchApi]);
   useEffect(() => { load(); }, [load]);
@@ -40,6 +41,7 @@ export default function ProductsPage() {
 
   const save = async () => {
     if (validationError) return setError(validationError);
+    try {
     const payload = {
       name: name.trim(),
       price_paise: rupeesToPaise(+pricePerPiece),
@@ -47,12 +49,14 @@ export default function ProductsPage() {
       strips_per_box: +stripsPerBox,
       pieces_per_box: +unitsPerStrip * +stripsPerBox,
       active,
+      ...Object.fromEntries(Object.entries(metadata).map(([key, value]) => [key, value.trim() || null])),
     };
     const res = editId
-      ? await fetchApi(`${API_URL}/admin/products/${editId}`, { method: 'PUT', body: JSON.stringify(payload) })
-      : await fetchApi(`${API_URL}/admin/products`, { method: 'POST', body: JSON.stringify({ id: `p-${Date.now()}`, ...payload }) });
+      ? await fetchApi(`${API_URL}/admin/products/${editId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      : await fetchApi(`${API_URL}/admin/products`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!res.ok) return setError((await res.json()).error || 'Save failed');
-    setName(''); setPricePerPiece(''); setUnitsPerStrip(''); setStripsPerBox(''); setActive(true); setEditId(''); await load();
+    setName(''); setPricePerPiece(''); setUnitsPerStrip(''); setStripsPerBox(''); setActive(true); setEditId(''); setMetadata({ sku: '', barcode: '', hsn: '', uom: '' }); await load();
+    } catch (e: any) { setError(e.message || 'Could not save product.'); }
   };
 
   const filtered = useMemo(() => products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())), [products, search]);
@@ -68,13 +72,14 @@ export default function ProductsPage() {
           <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="Price per piece (Rs)" value={pricePerPiece} onChange={e => setPricePerPiece(e.target.value)} />
           <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="Pieces per strip" value={unitsPerStrip} onChange={e => setUnitsPerStrip(e.target.value)} />
           <input className="border dark:border-gray-600 bg-transparent rounded p-2" placeholder="Strips per box" value={stripsPerBox} onChange={e => setStripsPerBox(e.target.value)} />
+          {(['sku', 'barcode', 'hsn', 'uom'] as const).map(field => <label key={field} className="text-sm">{field.toUpperCase()} (optional)<input className="border dark:border-gray-600 bg-transparent rounded p-2 w-full" value={metadata[field]} maxLength={field === 'hsn' ? 20 : field === 'uom' ? 30 : 100} onChange={e => setMetadata(current => ({ ...current, [field]: e.target.value }))} /></label>)}
         </div>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} /> Active</label>
         {preview && <p className="text-green-600 text-sm font-semibold">{preview}</p>}
         {validationError && <p className="text-amber-600 text-sm">{validationError}</p>}
         <div className="flex gap-2">
           <button onClick={save} className="bg-blue-600 text-white rounded px-4 py-2">{editId ? 'Update' : 'Add'}</button>
-          {editId && <button onClick={() => { setEditId(''); setName(''); setPricePerPiece(''); setUnitsPerStrip(''); setStripsPerBox(''); setActive(true); }} className="border rounded px-4 py-2">Cancel</button>}
+          {editId && <button onClick={() => { setEditId(''); setName(''); setPricePerPiece(''); setUnitsPerStrip(''); setStripsPerBox(''); setActive(true); setMetadata({ sku: '', barcode: '', hsn: '', uom: '' }); }} className="border rounded px-4 py-2">Cancel</button>}
         </div>
         <p className="text-xs text-gray-500">Price/conversion edits change only future calculations; historical ledger entries keep their original snapshot.</p>
       </div>
@@ -88,7 +93,7 @@ export default function ProductsPage() {
               <td className="p-2">{formatRupees(p.price_paise)}</td>
               <td className="p-2">1 Box = {p.strips_per_box} Strips = {p.pieces_per_box} Pieces</td>
               <td className="p-2">{p.active ? 'Yes' : 'No'}</td>
-              <td className="p-2 text-right"><button className="text-blue-600" onClick={() => { setEditId(p.id); setName(p.name); setPricePerPiece(String(p.price_paise / 100)); setUnitsPerStrip(String(p.units_per_strip)); setStripsPerBox(String(p.strips_per_box)); setActive(!!p.active); }}>Edit</button></td>
+              <td className="p-2 text-right"><button className="text-blue-600" onClick={() => { setEditId(p.id); setName(p.name); setPricePerPiece(String(p.price_paise / 100)); setUnitsPerStrip(String(p.units_per_strip)); setStripsPerBox(String(p.strips_per_box)); setActive(!!p.active); setMetadata({ sku: p.sku || '', barcode: p.barcode || '', hsn: p.hsn || '', uom: p.uom || '' }); }}>Edit</button></td>
             </tr>
           ))}</tbody>
         </table>

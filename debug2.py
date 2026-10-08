@@ -1,0 +1,2 @@
+from invoice2data.extract.invoice_template import InvoiceTemplate
+print(InvoiceTemplate.OPTIONS_DEFAULT)

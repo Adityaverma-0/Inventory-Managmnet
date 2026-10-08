@@ -1,0 +1,20 @@
+{
+  "name": "dashboard-backend",
+  "version": "1.0.0",
+  "description": "API Backend for Admin & Salesman Dashboards",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node --test tests/*.test.js",
+    "setup:admin": "node setup-admin.js",
+    "migrate": "node migrate.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "pg": "^8.13.0"
+  }
+}
