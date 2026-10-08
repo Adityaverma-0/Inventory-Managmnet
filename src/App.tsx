@@ -10,6 +10,8 @@ import ProductsPage from './features/admin/ProductsPage';
 import SalesmenPage from './features/admin/SalesmenPage';
 import PurchaseWorkflow from './features/admin/PurchaseWorkflow';
 import InventoryImport from './features/admin/InventoryImport';
+import ManualStockPage from './features/admin/ManualStockPage';
+
 import { Link } from 'react-router-dom';
 import './App.css';
 
@@ -42,6 +44,7 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
             <Link to="/salesmen" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Salesmen</Link>
             <Link to="/purchase" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Purchases (Receipts)</Link>
             <Link to="/inventory/import" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Inventory PDF Import</Link>
+            <Link to="/manual-stock" className="block px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Manual Stock Add</Link>
           </nav>
         </aside>
         <main className="flex-1 min-w-0 p-4 md:p-6 overflow-auto">
@@ -70,6 +73,7 @@ function App() {
                   <Route path="/salesmen" element={<SalesmenPage />} />
                   <Route path="/purchase" element={<PurchaseWorkflow />} />
                   <Route path="/inventory/import" element={<InventoryImport />} />
+                  <Route path="/manual-stock" element={<ManualStockPage />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </AdminLayout>
