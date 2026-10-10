@@ -2,7 +2,7 @@ export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8
 export function session() {
   try { return JSON.parse(localStorage.getItem('salesman_session') || 'null'); } catch { return null; }
 }
-export async function request(path: string, body?: unknown, retainKey = false) {
+export async function request(path: string, body?: unknown, retainKey = false) { 
   const auth = session();
   const headers: Record<string, string> = { Authorization: `Bearer ${auth?.token || ''}` };
   const identity = `pending:${auth?.user?.id}:${path}:${JSON.stringify(body)}`;
