@@ -63,6 +63,11 @@ export interface Invoice {
   previousBalancePaise?: number; 
   newBalancePaise?: number; 
   status: 'VALID' | 'VOID';
+  subtotalPaise?: number;
+  cgstPercent?: number;
+  sgstPercent?: number;
+  cgstAmountPaise?: number;
+  sgstAmountPaise?: number;
 }
 
 export type LedgerEntryType = 'LOAD_OUT' | 'LOAD_IN' | 'SALE' | 'SALE_CANCEL' | 'UNLOAD_OUT' | 'UNLOAD_IN' | 'HOLD_CARRY_FORWARD';
