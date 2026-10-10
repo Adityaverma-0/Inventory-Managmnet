@@ -92,7 +92,8 @@ export default function InvoicePrint() {
           {invoice.status === 'VOID' && (
             <p className="text-red-500 font-bold text-lg border-2 border-red-500 text-center my-2 p-1">VOID</p>
           )}
-          <p><strong>Salesman:</strong> {invoice.salesmanId}</p>
+          <p><strong>Salesman:</strong> {invoice.salesmanName || 'N/A'}</p>
+          <p><strong>Phone:</strong> {invoice.salesmanPhone || 'N/A'}</p>
           <p><strong>Vehicle:</strong> {invoice.vehicleId}</p>
           
           <p className="mt-1"><strong>Customer:</strong> {invoice.customerName || 'Walk-in'}</p>
@@ -122,8 +123,13 @@ export default function InvoicePrint() {
           </table>
         </div>
 
-        <div className="text-right text-base font-bold pb-2 border-b border-black">
-          Total: {formatRupees(invoice.totalAmountPaise)}
+        <div className="text-right text-sm py-2 border-b border-black">
+          <div className="flex justify-between"><span>Subtotal:</span> <span>{formatRupees(invoice.subtotalPaise || 0)}</span></div>
+          <div className="flex justify-between"><span>CGST ({invoice.cgstPercent}%):</span> <span>{formatRupees(invoice.cgstAmountPaise || 0)}</span></div>
+          <div className="flex justify-between"><span>SGST ({invoice.sgstPercent}%):</span> <span>{formatRupees(invoice.sgstAmountPaise || 0)}</span></div>
+        </div>
+        <div className="text-right text-base font-bold py-2 border-b border-black">
+          Grand Total: {formatRupees(invoice.totalAmountPaise)}
         </div>
         
         <div className="text-[11px] mt-2 pb-2 border-b border-black border-dashed">

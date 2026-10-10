@@ -50,6 +50,8 @@ export interface Invoice {
   calendarDate: string; // YYYY-MM-DD local time, source of truth
   workDayId: string; 
   salesmanId: string;
+  salesmanName?: string;
+  salesmanPhone?: string;
   vehicleId: string;
   outletId: string; 
   customerId?: string; 
@@ -106,6 +108,8 @@ export interface WorkDay {
   calendarDate: string; // YYYY-MM-DD
   state: DayState;
   salesmanId: string;
+  salesmanName?: string;
+  salesmanPhone?: string;
   vehicleId: string;
   warehouseId: string;
   routeId: string;
