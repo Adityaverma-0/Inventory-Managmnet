@@ -46,11 +46,11 @@ export default function TaxSettings() {
       <div className="space-y-4">
         <div>
           <label className="block text-sm">CGST %</label>
-          <input type="number" step="0.01" value={cgst} onChange={e => setCgst(Number(e.target.value))} className="w-full p-2 border rounded" />
+          <input type="number" step="0.01" value={cgst} onChange={e => setCgst(Number(e.target.value))} className="w-full p-2 border rounded text-black bg-white" />
         </div>
         <div>
           <label className="block text-sm">SGST %</label>
-          <input type="number" step="0.01" value={sgst} onChange={e => setSgst(Number(e.target.value))} className="w-full p-2 border rounded" />
+          <input type="number" step="0.01" value={sgst} onChange={e => setSgst(Number(e.target.value))} className="w-full p-2 border rounded text-black bg-white" />
         </div>
         <button onClick={handleSave} className="w-full bg-blue-600 text-white p-2 rounded">Save Tax Rates</button>
         {message && <p className="text-sm text-center">{message}</p>}
