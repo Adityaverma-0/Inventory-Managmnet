@@ -3,6 +3,31 @@ import { request, session, acknowledge } from './apiClient';
 import { setCatalog } from './catalog';
 import { Customer, DayState, Invoice, WorkDay } from '../domain/types';
 
+
+let currentTax: { cgst: number; sgst: number } = (() => {
+  try {
+    const saved = localStorage.getItem("app_tax_settings");
+    return saved ? JSON.parse(saved) : { cgst: 0, sgst: 0 };
+  } catch {
+    return { cgst: 0, sgst: 0 };
+  }
+})();
+
+export function getTaxSettings(): { cgst: number; sgst: number } {
+  return currentTax;
+}
+
+export async function fetchTaxSettings(): Promise<{ cgst: number; sgst: number }> {
+  try {
+    const res = await request("/settings/tax");
+    if (res && (typeof res.cgst === "number" || typeof res.sgst === "number")) {
+      currentTax = { cgst: Number(res.cgst) || 0, sgst: Number(res.sgst) || 0 };
+      try { localStorage.setItem("app_tax_settings", JSON.stringify(currentTax)); } catch {}
+    }
+  } catch {}
+  return currentTax;
+}
+
 let refreshing: Promise<void> | null = null;
 let refreshedAt = 0;
 let refreshedAccount = ''; 
@@ -21,7 +46,12 @@ export function refreshData(force = false): Promise<void> {
       await store.clear();
       for (const row of data[name]) await store.put(row);
     }
-    await tx.done; setCatalog(data.products); refreshedAt = Date.now(); refreshedAccount = account;
+    await tx.done; setCatalog(data.products);
+    if (data.tax) {
+      currentTax = { cgst: Number(data.tax.cgst) || 0, sgst: Number(data.tax.sgst) || 0 };
+      try { localStorage.setItem("app_tax_settings", JSON.stringify(currentTax)); } catch {}
+    }
+    refreshedAt = Date.now(); refreshedAccount = account;
   })().finally(() => { refreshing = null; });
   return refreshing;
 }

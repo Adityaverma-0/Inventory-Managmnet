@@ -49,6 +49,7 @@ export async function initializeDatabase() {
     )`);
     await client.query(fs.readFileSync(path.join(backendDir, 'migrations/001_inventory_import.sql'), 'utf8'));
     await client.query(fs.readFileSync(path.join(backendDir, 'migrations/002_production_integrity.sql'), 'utf8'));
+    await client.query(fs.readFileSync(path.join(backendDir, 'migrations/003_tax_settings.sql'), 'utf8'));
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

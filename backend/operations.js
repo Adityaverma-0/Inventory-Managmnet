@@ -83,9 +83,9 @@ async function snapshot(c, user) {
   const products = (await c.query('SELECT * FROM products ORDER BY name')).rows.map(productDto);
   const days = (await c.query('SELECT w.*,s.name AS salesman_name,v.name AS vehicle_name,g.name AS godown_name FROM work_days w JOIN salesmen s ON s.id=w.salesman_id JOIN vehicles v ON v.id=w.vehicle_id JOIN godowns g ON g.id=w.godown_id WHERE w.salesman_id=$1 ORDER BY w.opened_at DESC',[user.id])).rows;
   const ids = days.map(d=>d.work_day_id);
-  const rawInvoices = (await c.query('SELECT i.*, s.name as salesman_name, s.phone as salesman_phone FROM invoices i JOIN salesmen s ON i.salesman_id = s.id WHERE i.salesman_id=$1 ORDER BY i.created_at',[user.id])).rows;
+  const rawInvoices = (await c.query('SELECT i.*, s.name as salesman_name, s.phone as salesman_phone FROM invoices i LEFT JOIN salesmen s ON i.salesman_id = s.id WHERE i.salesman_id=$1 ORDER BY i.created_at',[user.id])).rows;
   const items = (await c.query('SELECT * FROM sale_items WHERE invoice_id=ANY($1::varchar[])',[rawInvoices.map(i=>i.id)])).rows;
-  const invoices = rawInvoices.map(i=>({id:i.id,invoiceNumber:i.invoice_number,createdAt:number(i.created_at),calendarDate:dateString(i.calendar_date),workDayId:i.work_day_id,salesmanId:i.salesman_id,salesmanName:i.salesman_name,salesmanPhone:i.salesman_phone,vehicleId:i.vehicle_id,outletId:i.outlet_id || '',customerId:i.customer_id,customerName:i.customer_name,totalAmountPaise:number(i.total_amount_paise),paymentMode:i.payment_mode,paymentRef:i.payment_ref,previousBalancePaise:number(i.previous_balance_paise),newBalancePaise:number(i.new_balance_paise),status:i.status,cgstPercent:number(i.cgst_percent),sgstPercent:number(i.sgst_percent),cgstAmountPaise:number(i.cgst_amount_paise),sgstAmountPaise:number(i.sgst_amount_paise),subtotalPaise:number(i.subtotal_paise),items:items.filter(x=>x.invoice_id===i.id).map(x=>({productId:x.product_id,quantityPieces:x.quantity_pieces,lineTotalPaise:number(x.line_total_paise),productSnapshot:x.product_snapshot}))}));
+  const invoices = rawInvoices.map(i=>({id:i.id,invoiceNumber:i.invoice_number,createdAt:number(i.created_at),calendarDate:dateString(i.calendar_date),workDayId:i.work_day_id,salesmanId:i.salesman_id,salesmanName:i.salesman_name || user.name || i.salesman_id,salesmanPhone:i.salesman_phone || user.phone || '',vehicleId:i.vehicle_id,outletId:i.outlet_id || '',customerId:i.customer_id,customerName:i.customer_name,totalAmountPaise:number(i.total_amount_paise),paymentMode:i.payment_mode,paymentRef:i.payment_ref,previousBalancePaise:number(i.previous_balance_paise),newBalancePaise:number(i.new_balance_paise),status:i.status,cgstPercent:number(i.cgst_percent),sgstPercent:number(i.sgst_percent),cgstAmountPaise:number(i.cgst_amount_paise),sgstAmountPaise:number(i.sgst_amount_paise),subtotalPaise:number(i.subtotal_paise),items:items.filter(x=>x.invoice_id===i.id).map(x=>({productId:x.product_id,quantityPieces:x.quantity_pieces,lineTotalPaise:number(x.line_total_paise),productSnapshot:x.product_snapshot}))}));
   const assignment = (await c.query('SELECT v.id,v.godown_id FROM vehicles v JOIN salesmen s ON s.vehicle_id=v.id WHERE s.id=$1 AND v.active=TRUE',[user.id])).rows[0];
   const locations = assignment ? [assignment.id,assignment.godown_id] : [];
   // Warehouse balances are shared; historical vehicle entries belong only to this user's work days.
@@ -94,7 +94,10 @@ async function snapshot(c, user) {
   const loads = (await c.query("SELECT response FROM api_operations WHERE actor_id=$1 AND operation='load' ORDER BY created_at",[user.id])).rows.map(x=>x.response);
   const accounting = (await c.query('SELECT * FROM accounting_ledger WHERE work_day_id=ANY($1::varchar[])',[ids])).rows.map(a=>({id:a.id,timestamp:number(a.timestamp),type:a.type,amountPaise:number(a.amount_paise),customerId:a.customer_id,invoiceId:a.invoice_id,workDayId:a.work_day_id}));
   const customers = (await c.query('SELECT * FROM customers ORDER BY name')).rows.map(customerDto);
-  return { products, workDays:days.map(d=>dayDto(d,invoices)),invoices,ledger:ledgerRows,loads,accounting,customers,outlets:customers.map(c=>({id:c.id,name:c.shopName || c.name,status:invoices.some(i=>i.customerId===c.id && i.workDayId===days[0]?.work_day_id && i.status==='VALID')?'Visited':'Pending'})) };
+  const taxRes = await c.query("SELECT data FROM app_settings WHERE id='tax'");
+  const taxData = taxRes.rows[0]?.data || {cgst:0, sgst:0};
+  const tax = { cgst: Number(taxData.cgst) || 0, sgst: Number(taxData.sgst) || 0 };
+  return { products, workDays:days.map(d=>dayDto(d,invoices)),invoices,ledger:ledgerRows,loads,accounting,customers,outlets:customers.map(c=>({id:c.id,name:c.shopName || c.name,status:invoices.some(i=>i.customerId===c.id && i.workDayId===days[0]?.work_day_id && i.status==='VALID')?'Visited':'Pending'})), tax };
 }
 
 export function installOperations(app,pool) {
@@ -336,6 +339,7 @@ export function installOperations(app,pool) {
     const history={...d.metadata.historicalStockLevels};for(const r of d.request_data.products)history[r.productId]=[...(history[r.productId]||[]),r.totalAvailable].slice(-7);
     await c.query("UPDATE work_days SET state='CLOSED',closed_at=$2,admin_note='Job cleared',metadata=metadata||$3::jsonb WHERE work_day_id=$1",[d.work_day_id,Date.now(),JSON.stringify({historicalStockLevels:history})]);await audit(c,'UNLOAD_APPROVED',d.work_day_id);return {success:true};
   })));
+  app.get("/api/v2/settings/tax", endpoint(async req => (await pool.query("SELECT data FROM app_settings WHERE id=$1", ["tax"])).rows[0]?.data || {cgst:0, sgst:0}));
   app.get("/api/v2/admin/settings/tax", endpoint(async req => (await pool.query("SELECT data FROM app_settings WHERE id=$1", ["tax"])).rows[0]?.data || {cgst:0, sgst:0}));
   app.put("/api/v2/admin/settings/tax", endpoint(async req => {
     const {cgst, sgst} = req.body;
