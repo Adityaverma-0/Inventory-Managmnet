@@ -4,6 +4,18 @@ import { useNavigate } from 'react-router-dom';
 
 // Retain keys after an ambiguous network failure so a retry cannot duplicate stock.
 const pending = new Map<string, string>();
+
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function useApi(_options: { backendOnly?: boolean } = {}) {
   const { token, logout } = useAuth();
   const navigate = useNavigate();
@@ -14,7 +26,7 @@ export function useApi(_options: { backendOnly?: boolean } = {}) {
     const mutation = options.method && !['GET','HEAD'].includes(options.method);
     const identity = `${token}:${url}:${options.method}:${options.body || ''}`;
     if (mutation) {
-      const key = pending.get(identity) || crypto.randomUUID();
+      const key = pending.get(identity) || generateUUID();
       pending.set(identity, key); headers.set('Idempotency-Key', key);
     }
     const response = await fetch(url, { ...options, headers });
