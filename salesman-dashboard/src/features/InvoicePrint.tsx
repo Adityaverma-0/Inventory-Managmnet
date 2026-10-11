@@ -127,8 +127,8 @@ export default function InvoicePrint() {
           <>
             <div className="text-right text-sm py-2 border-b border-black">
               <div className="flex justify-between"><span>Subtotal:</span> <span>{formatRupees(invoice.subtotalPaise)}</span></div>
-              <div className="flex justify-between"><span>CGST ({invoice.cgstPercent}%):</span> <span>{formatRupees(invoice.cgstAmountPaise)}</span></div>
-              <div className="flex justify-between"><span>SGST ({invoice.sgstPercent}%):</span> <span>{formatRupees(invoice.sgstAmountPaise)}</span></div>
+              <div className="flex justify-between"><span>CGST ({invoice.cgstPercent ?? 0}%):</span> <span>{formatRupees(invoice.cgstAmountPaise || 0)}</span></div>
+              <div className="flex justify-between"><span>SGST ({invoice.sgstPercent ?? 0}%):</span> <span>{formatRupees(invoice.sgstAmountPaise || 0)}</span></div>
             </div>
             <div className="text-right text-base font-bold py-2 border-b border-black flex justify-between">
               <span>Grand Total:</span>

@@ -106,9 +106,6 @@ export interface LoadEvent {
 }
 
 export interface WorkDay {
-  salesmanName?: string;
-  vehicleName?: string;
-  warehouseName?: string;
   workDayId: string;
   calendarDate: string; // YYYY-MM-DD
   state: DayState;
@@ -116,7 +113,9 @@ export interface WorkDay {
   salesmanName?: string;
   salesmanPhone?: string;
   vehicleId: string;
+  vehicleName?: string;
   warehouseId: string;
+  warehouseName?: string;
   routeId: string;
   openedAt: number;
   routeStartedAt?: number;
