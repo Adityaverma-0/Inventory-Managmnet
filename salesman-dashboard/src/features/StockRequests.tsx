@@ -2,7 +2,19 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { request } from '../data/apiClient';
-import { formatDateTimeIST } from '../domain/dates';
+
+function formatDateTimeIST(val: unknown): string {
+  if (val === null || val === undefined || val === '') return 'N/A';
+  const n = Number(val);
+  const ms = !isNaN(n) ? (n < 1e12 ? n * 1000 : n) : new Date(String(val)).getTime();
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return 'Invalid Date';
+  return d.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
+}
 
 export default function StockRequests() {
   const navigate = useNavigate();
@@ -12,7 +24,7 @@ export default function StockRequests() {
   useEffect(() => {
     const fetchRequests = async () => {
       try {
-        const data = await request('/salesman/stock-requests', {});
+        const data = await request('/salesman/stock-requests');
         setRequests(data);
       } catch (e) {
         console.error('Failed to fetch requests', e);

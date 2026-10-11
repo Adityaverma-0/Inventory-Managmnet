@@ -5,6 +5,8 @@ import { CheckCircle, List, Warehouse, Truck, Package, Users, FileUp, Database ,
 
 import Login from './features/auth/Login';
 import ApprovalDashboard from './features/admin/ApprovalDashboard';
+import StockApprovalDashboard from './features/admin/StockApprovalDashboard';
+
 import AuditLog from './features/admin/AuditLog';
 import GodownsPage from './features/admin/GodownsPage';
 import VehiclesPage from './features/admin/VehiclesPage';
@@ -46,7 +48,8 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
       <div className="flex flex-col md:flex-row flex-1">
         <aside className="w-full md:w-64 md:shrink-0 bg-white dark:bg-gray-800 shadow-sm border-r dark:border-gray-700">
           <nav className="p-4 flex flex-wrap md:block md:space-y-2">
-            <NavLink to="/" className={navClass}><CheckCircle size={18} /> Approvals</NavLink>
+            <NavLink to="/" className={navClass}><CheckCircle size={18} /> Unload Approvals</NavLink>
+            <NavLink to="/stock-approvals" className={navClass}><Package size={18} /> Stock Approvals</NavLink>
             <NavLink to="/audit" className={navClass}><List size={18} /> Audit Log</NavLink>
             <NavLink to="/godowns" className={navClass}><Warehouse size={18} /> Godowns</NavLink>
             <NavLink to="/vehicles" className={navClass}><Truck size={18} /> Vehicles</NavLink>
@@ -77,6 +80,7 @@ function App() {
               <AdminLayout>
                 <Routes>
                   <Route path="/" element={<ApprovalDashboard />} />
+                  <Route path="/stock-approvals" element={<StockApprovalDashboard />} />
                   <Route path="/audit" element={<AuditLog />} />
                   <Route path="/godowns" element={<GodownsPage />} />
                   <Route path="/vehicles" element={<VehiclesPage />} />

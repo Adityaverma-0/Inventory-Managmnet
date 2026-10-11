@@ -103,7 +103,7 @@ export default function LoadStock() {
 
     if (items.length === 0) return;
 
-    if (confirm('Confirm loading stock into vehicle?')) {
+    if (confirm('Submit stock request for admin approval?')) {
       if (saving.current) return;
       saving.current = true;
       try { await submitLoadStock(summary.workDayId, summary.warehouseId, summary.vehicleId, items); navigate('/'); }
@@ -226,7 +226,7 @@ export default function LoadStock() {
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl text-lg flex items-center justify-center space-x-2 active:scale-95"
           >
             <Download size={20} />
-            <span>Confirm Load</span>
+            <span>Submit Stock Request</span>
           </button>
         </div>
       )}
