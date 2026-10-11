@@ -5,6 +5,7 @@ import { formatRupees } from '../../domain/money';
 import { formatDateTimeIST, formatCalendarDateIST } from '../../domain/dates';
 import StockSummaryTable from '../stock/StockSummaryTable';
 import CashBreakdownTable from '../CashBreakdownTable';
+import StockApprovalDashboard from './StockApprovalDashboard';
 
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v2';
@@ -18,6 +19,7 @@ export default function ApprovalDashboard() {
   const [error, setError] = useState('');
   const [busyDayId, setBusyDayId] = useState('');
   const [selectedReq, setSelectedReq] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'stock' | 'unload'>('stock');
 
   const getSalesmanName = useCallback((id: string) => {
     const row = salesmen.find(s => s.id === id);

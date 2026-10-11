@@ -110,12 +110,20 @@ export default function Home() {
             <h2 className="text-xl font-bold mb-1">Welcome, {summary.salesmanName || summary.salesmanId}</h2>
             <p className="text-sm text-gray-500">{summary.vehicleName || summary.vehicleId}</p>
           </div>
+          <div className="flex flex-col gap-2">
           <button 
             onClick={() => navigate('/load-stock')}
             className="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg text-sm"
           >
             Top-up Stock
           </button>
+          <button 
+            onClick={() => navigate('/stock-requests')}
+            className="text-blue-600 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg text-sm"
+          >
+            My Requests
+          </button>
+          </div>
         </div>
 
         {hasHeldStock && summary.state === 'NOT_STARTED' && (

@@ -15,6 +15,7 @@ import SummaryPage from './features/SummaryTabs';
 import LoadStockPage from './features/LoadStock';
 import UnloadPage from './features/Unload';
 import InvoicePrintPage from './features/InvoicePrint';
+import StockRequestsPage from './features/StockRequests';
 
 // Direct Sell Pages
 import CustomerSelectPage from './features/direct-sell/CustomerSelect';
@@ -140,6 +141,7 @@ function App() {
         <Route path="/summary" element={<Layout onLogout={logout}><SummaryPage /></Layout>} />
         <Route path="/admin" element={<Navigate to="/" replace />} />
         <Route path="/load-stock" element={<Layout onLogout={logout}><LoadStockPage /></Layout>} />
+        <Route path="/stock-requests" element={<Layout onLogout={logout}><StockRequestsPage /></Layout>} />
         <Route path="/unload" element={<Layout onLogout={logout}><UnloadPage /></Layout>} />
         <Route path="/print/:invoiceId" element={<Layout onLogout={logout}><InvoicePrintPage /></Layout>} />
         

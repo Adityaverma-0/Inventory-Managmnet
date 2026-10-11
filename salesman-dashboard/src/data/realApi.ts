@@ -81,7 +81,7 @@ export const startNewWorkDay = fetchActiveWorkDay;
 export const devResetDay = fetchActiveWorkDay;
 export const seedInitialData = refreshData; // Compatibility only: production never seeds records.
 export const updateDayState = (id: string, state: DayState) => mutate(`/salesman/work-days/${id}/state`, {state});
-export const submitLoadStock = (workDayId: string, _warehouseId: string, _vehicleId: string, items: {productId:string;quantityPieces:number}[]) => mutate('/salesman/loads',{workDayId,items});
+export const submitLoadStock = (workDayId: string, _warehouseId: string, _vehicleId: string, items: {productId:string;quantityPieces:number}[]) => mutate('/salesman/stock-requests',{workDayId,items});
 export async function saveSaleGenerateInvoice(workDayId: string, sale: Omit<Invoice,'id'|'invoiceNumber'|'status'|'createdAt'|'calendarDate'|'previousBalancePaise'|'newBalancePaise'|'workDayId'|'customerName'>): Promise<string> {
   return (await mutate('/salesman/sales',{...sale,workDayId})).id;
 }
