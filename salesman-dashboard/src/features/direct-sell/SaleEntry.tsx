@@ -322,7 +322,7 @@ const updateCart = (productId: string, field: 'boxes'|'strips'|'pieces', delta: 
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h3 className="font-bold text-lg">{product.name}</h3>
-                    <p className="text-sm text-gray-500">In Van: {formatQuantity(remaining, product)} • {formatRupees(product.pricePaise)}/pc</p>
+                    <p className="text-sm text-gray-500">In Van: {formatQuantity(remaining, product)} • {formatRupees(product.pricePaise * (product.unitsPerStrip || 1))}/strip</p>
                   </div>
                   <div className="text-right font-bold text-blue-600 dark:text-blue-400">
                     {formatRupees(displayToPieces(qty, product) * product.pricePaise)}
