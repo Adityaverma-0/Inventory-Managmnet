@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Customer, SaleItem, PaymentMode } from '../../domain/types';
 import { PRODUCTS, productMap } from '../../data/catalog';
-import { BASE_URL } from '../../data/apiClient';
 import { getLedger, saveSaleGenerateInvoice, fetchActiveWorkDay, getCustomers } from '../../data/mockApi';
 
 import { calculateRemainingStock } from '../../domain/stockLedger';
@@ -20,7 +19,6 @@ export default function SaleEntry() {
   const [ledger, setLedger] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [customer, setCustomer] = useState<Customer | undefined>();
-  const [taxSettings, setTaxSettings] = useState({cgst: 0, sgst: 0});
   
   const [cart, setCart] = useState<Record<string, { boxes: number; strips: number; pieces: number }>>({});
   const [errorMsg, setErrorMsg] = useState('');
