@@ -18,11 +18,12 @@ export default function SalesDashboard() {
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const url = new URL(`${API_URL}/admin/sales-dashboard`);
-      if (customDate) url.searchParams.set('date', customDate);
-      else url.searchParams.set('period', period);
+      const params = new URLSearchParams();
+      if (customDate) params.set('date', customDate);
+      else params.set('period', period);
+      const query = params.toString() ? `?${params.toString()}` : '';
 
-      const res = await fetchApi(url.toString());
+      const res = await fetchApi(`${API_URL}/admin/sales${query}`);
       if (!res.ok) throw new Error((await res.json()).error || 'Failed to fetch sales data');
       setData(await res.json());
       setError('');
