@@ -254,7 +254,7 @@ export function installOperations(app,pool) {
   })));
 
   app.post('/api/v2/salesman/stock-requests',endpoint(req=>operation(pool,req,'stock-request',async c=>{
-    const d=await ownDay(c,req.body.workDayId,req.user,['LOADING','ON_ROUTE']);
+    const d=await ownDay(c,req.body.workDayId,req.user,['NOT_STARTED','LOADING','ON_ROUTE']);
     await activeGodown(c,d.godown_id);
     const items=await productsFor(c,req.body.items);
     const rawItems=Array.isArray(req.body.items)?req.body.items:[];

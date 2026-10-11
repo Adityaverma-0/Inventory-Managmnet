@@ -98,7 +98,13 @@ export default function LoadStock() {
     if (!summary) return;
     const items = Object.entries(cart).map(([productId, display]) => {
       const p = productMap.get(productId)!;
-      return { productId, quantityPieces: displayToPieces(display, p) };
+      return {
+        productId,
+        quantityPieces: displayToPieces(display, p),
+        boxes: display.boxes,
+        strips: display.strips,
+        pieces: display.pieces
+      };
     }).filter(i => i.quantityPieces > 0);
 
     if (items.length === 0) return;
