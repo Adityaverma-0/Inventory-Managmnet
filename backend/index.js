@@ -253,6 +253,10 @@ app.post('/api/v2/admin/extract-invoice', async (req, res) => {
   }
 });
 
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Endpoint not found.' });
+});
+
 app.use((error, _req, res, next) => {
   if (error.type === 'entity.too.large' || error.type === 'entity.parse.failed') {
     return res.status(error.status || 400).json({ success: false, error: error.type === 'entity.too.large' ? 'PDF upload is too large.' : 'Invalid JSON request.' });
